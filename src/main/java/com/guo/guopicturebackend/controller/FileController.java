@@ -70,7 +70,7 @@ public class FileController {
      */
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @GetMapping("/test/download/")
-    public void testDownloadFile(String filepath, HttpServletResponse response) throws IOException {
+    public void testDownloadFile(@RequestParam("filepath") String filepath, HttpServletResponse response) throws IOException {
         COSObjectInputStream cosObjectInput = null;
         try {
             COSObject cosObject = cosManager.getObject(filepath);
@@ -92,6 +92,8 @@ public class FileController {
             }
         }
     }
+
+
 
 }
 
