@@ -10,6 +10,7 @@ import com.guo.guopicturebackend.model.entity.Picture;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.guo.guopicturebackend.model.entity.User;
 import com.guo.guopicturebackend.model.vo.PictureVO;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
@@ -66,6 +67,9 @@ public interface PictureService extends IService<Picture> {
             PictureUploadByBatchRequest pictureUploadByBatchRequest,
             User loginUser
     );
+
+    public void clearPictureFile(Picture oldPicture);
+
 
 
 }

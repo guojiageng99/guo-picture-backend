@@ -38,6 +38,12 @@ public class UploadPictureResult {
     /**  
      * 图片格式  
      */  
-    private String picFormat;  
-  
+    private String picFormat;
+
+    /**
+     * 缩略图 url
+     */
+    private String thumbnailUrl;
+
+
 }
