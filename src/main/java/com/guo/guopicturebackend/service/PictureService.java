@@ -2,10 +2,8 @@ package com.guo.guopicturebackend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.guo.guopicturebackend.model.dto.picture.PictureQueryRequest;
-import com.guo.guopicturebackend.model.dto.picture.PictureReviewRequest;
-import com.guo.guopicturebackend.model.dto.picture.PictureUploadByBatchRequest;
-import com.guo.guopicturebackend.model.dto.picture.PictureUploadRequest;
+import com.guo.guopicturebackend.api.aliyun.model.CreateOutPaintingTaskResponse;
+import com.guo.guopicturebackend.model.dto.picture.*;
 import com.guo.guopicturebackend.model.entity.Picture;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.guo.guopicturebackend.model.entity.User;
@@ -72,5 +70,12 @@ public interface PictureService extends IService<Picture> {
     public void clearPictureFile(Picture oldPicture);
 
     public List<PictureVO> searchPictureByColor(Long spaceId, String picColor, User loginUser);
+
+    public void editPictureByBatch(PictureEditByBatchRequest pictureEditByBatchRequest, User loginUser);
+
+    public CreateOutPaintingTaskResponse createPictureOutPaintingTask(
+            CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, User loginUser);
+
+    public void checkPictureAuth(User loginUser, Picture picture);
 
 }
