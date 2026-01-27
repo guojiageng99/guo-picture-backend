@@ -1,6 +1,8 @@
 package com.guo.guopicturebackend.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.guo.guopicturebackend.model.dto.space.SpaceAddRequest;
+import com.guo.guopicturebackend.model.dto.space.SpaceQueryRequest;
 import com.guo.guopicturebackend.model.entity.Space;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.guo.guopicturebackend.model.entity.User;
@@ -19,4 +21,6 @@ public interface SpaceService extends IService<Space> {
     public long addSpace(SpaceAddRequest spaceAddRequest, User loginUser);
 
     public void checkSpaceAuth(User loginUser, Space space);
+
+    public QueryWrapper<Space> getQueryWrapper(SpaceQueryRequest spaceQueryRequest);
 }
