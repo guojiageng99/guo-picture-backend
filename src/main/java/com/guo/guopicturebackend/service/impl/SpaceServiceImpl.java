@@ -7,16 +7,21 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.exception.ThrowUtils;
+import com.guo.guopicturebackend.manager.sharding.DynamicShardingManager;
 import com.guo.guopicturebackend.model.dto.space.SpaceAddRequest;
 import com.guo.guopicturebackend.model.dto.space.SpaceQueryRequest;
 import com.guo.guopicturebackend.model.entity.Space;
+import com.guo.guopicturebackend.model.entity.SpaceUser;
 import com.guo.guopicturebackend.model.entity.User;
 import com.guo.guopicturebackend.model.enums.SpaceLevelEnum;
+import com.guo.guopicturebackend.model.enums.SpaceRoleEnum;
 import com.guo.guopicturebackend.model.enums.SpaceTypeEnum;
 import com.guo.guopicturebackend.service.SpaceService;
 import com.guo.guopicturebackend.mapper.SpaceMapper;
+import com.guo.guopicturebackend.service.SpaceUserService;
 import com.guo.guopicturebackend.service.UserService;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -36,6 +41,17 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private SpaceUserService spaceUserService;
+
+    @Resource
+    private TransactionTemplate transactionTemplate;
+
+    // 为了方便部署，注释掉分表
+    @Resource
+    @Lazy
+    private DynamicShardingManager dynamicShardingManager;
 
     @Override
     public void validSpace(Space space, boolean add) {
@@ -87,8 +103,6 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
         }
     }
 
-    @Resource
-    private TransactionTemplate transactionTemplate;
 
     Map<Long, Object> lockMap = new ConcurrentHashMap<>();
 
@@ -134,6 +148,17 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
                 // 写入数据库
                 boolean result = this.save(space);
                 ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+                // 创建成功后，如果是团队空间，关联新增团队成员记录
+                if (SpaceTypeEnum.TEAM.getValue() == space.getSpaceType()) {
+                    SpaceUser spaceUser = new SpaceUser();
+                    spaceUser.setSpaceId(space.getId());
+                    spaceUser.setUserId(userId);
+                    spaceUser.setSpaceRole(SpaceRoleEnum.ADMIN.getValue());
+                    result = spaceUserService.save(spaceUser);
+                    ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "创建团队成员记录失败");
+                }
+//                // 创建分表（仅对团队空间生效）为方便部署，暂时不使用
+                dynamicShardingManager.createSpacePictureTable(space);
                 // 返回新写入的数据 id
                 return space.getId();
             });
