@@ -2,8 +2,10 @@ package com.guo.guopicturebackend.model.dto.picture;
 
 import lombok.Data;
 
+import java.io.Serializable;
+
 @Data
-public class PictureUploadByBatchRequest {  
+public class PictureUploadByBatchRequest implements Serializable {
   
     /**  
      * 搜索词  
@@ -20,4 +22,5 @@ public class PictureUploadByBatchRequest {
      */
     private String namePrefix;
 
+    private static final long serialVersionUID = 1L;
 }

@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
 import java.io.Serializable;
 import java.util.Date;
 
@@ -12,6 +14,7 @@ import java.util.Date;
  * @TableName space_user
  */
 @TableName(value ="space_user")
+@Data
 public class SpaceUser implements Serializable {
     /**
      * id
@@ -47,87 +50,5 @@ public class SpaceUser implements Serializable {
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
 
-    /**
-     * id
-     */
-    public Long getId() {
-        return id;
-    }
 
-    /**
-     * id
-     */
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    /**
-     * 空间 id
-     */
-    public Long getSpaceId() {
-        return spaceId;
-    }
-
-    /**
-     * 空间 id
-     */
-    public void setSpaceId(Long spaceId) {
-        this.spaceId = spaceId;
-    }
-
-    /**
-     * 用户 id
-     */
-    public Long getUserId() {
-        return userId;
-    }
-
-    /**
-     * 用户 id
-     */
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
-
-    /**
-     * 空间角色：viewer/editor/admin
-     */
-    public String getSpaceRole() {
-        return spaceRole;
-    }
-
-    /**
-     * 空间角色：viewer/editor/admin
-     */
-    public void setSpaceRole(String spaceRole) {
-        this.spaceRole = spaceRole;
-    }
-
-    /**
-     * 创建时间
-     */
-    public Date getCreateTime() {
-        return createTime;
-    }
-
-    /**
-     * 创建时间
-     */
-    public void setCreateTime(Date createTime) {
-        this.createTime = createTime;
-    }
-
-    /**
-     * 更新时间
-     */
-    public Date getUpdateTime() {
-        return updateTime;
-    }
-
-    /**
-     * 更新时间
-     */
-    public void setUpdateTime(Date updateTime) {
-        this.updateTime = updateTime;
-    }
 }

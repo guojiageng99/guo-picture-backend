@@ -3,6 +3,7 @@ package com.guo.guopicturebackend.model.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.Date;
 
 /**
@@ -11,7 +12,7 @@ import java.util.Date;
  */
 @TableName(value ="space")
 @Data
-public class Space {
+public class Space implements Serializable {
     /**
      * id
      */

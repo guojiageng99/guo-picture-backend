@@ -3,6 +3,7 @@ package com.guo.guopicturebackend.model.dto.picture;
 import com.guo.guopicturebackend.common.PageRequest;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -10,6 +11,7 @@ import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
+@NoArgsConstructor
 public class PictureQueryRequest extends PageRequest implements Serializable {
   
     /**  
@@ -86,6 +88,11 @@ public class PictureQueryRequest extends PageRequest implements Serializable {
      * 审核人 id
      */
     private Long reviewerId;
+
+    /**
+     * 审核时间
+     */
+    private Date reviewTime;
 
     /**
      * 空间 id

@@ -1,11 +1,9 @@
 package com.guo.guopicturebackend.model.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.Date;
 
 /**
@@ -14,7 +12,7 @@ import java.util.Date;
  */
 @TableName(value ="picture")
 @Data
-public class Picture {
+public class Picture implements Serializable {
     /**
      * id
      */
@@ -131,6 +129,7 @@ public class Picture {
      */
     private String picColor;
 
-
+    @TableField(exist = false)
+    private static final long serialVersionUID = 1L;
 
 }

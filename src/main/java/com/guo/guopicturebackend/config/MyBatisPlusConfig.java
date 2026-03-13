@@ -19,7 +19,13 @@ public class MyBatisPlusConfig {
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
         // 分页插件
-        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
+        PaginationInnerInterceptor paginationInnerInterceptor = new PaginationInnerInterceptor();
+        paginationInnerInterceptor.setDbType(DbType.MYSQL);
+        // 设置单页分页条数限制，默认无限制
+        paginationInnerInterceptor.setMaxLimit(500L);
+        // 溢出总页数后进行处理，true表示返回第一页，false表示继续请求
+        paginationInnerInterceptor.setOverflow(false);
+        interceptor.addInnerInterceptor(paginationInnerInterceptor);
         return interceptor;
     }
 }
