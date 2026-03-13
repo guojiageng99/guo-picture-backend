@@ -3,6 +3,7 @@ package com.guo.guopicturebackend.service.impl;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
@@ -16,6 +17,7 @@ import com.guo.guopicturebackend.model.entity.User;
 import com.guo.guopicturebackend.model.enums.SpaceLevelEnum;
 import com.guo.guopicturebackend.model.enums.SpaceRoleEnum;
 import com.guo.guopicturebackend.model.enums.SpaceTypeEnum;
+import com.guo.guopicturebackend.model.vo.SpaceVO;
 import com.guo.guopicturebackend.service.SpaceService;
 import com.guo.guopicturebackend.mapper.SpaceMapper;
 import com.guo.guopicturebackend.service.SpaceUserService;
@@ -26,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -206,6 +209,16 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
         // 排序
         queryWrapper.orderBy(StrUtil.isNotEmpty(sortField), sortOrder.equals("ascend"), sortField);
         return queryWrapper;
+    }
+
+    @Override
+    public SpaceVO getSpaceVO(Space space, HttpServletRequest request) {
+        return null;
+    }
+
+    @Override
+    public Page<SpaceVO> getSpaceVOPage(Page<Space> spacePage, HttpServletRequest request) {
+        return null;
     }
 
 }

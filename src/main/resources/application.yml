@@ -1,5 +1,5 @@
 server:
-  port: 8123
+  port: 9123
   servlet:
     context-path: /api
     # cookie 30 天过期
@@ -70,8 +70,6 @@ mybatis-plus:
     map-underscore-to-camel-case: false
     # 仅在开发环境开启日志
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-
-
   global-config:
     db-config:
       logic-delete-field: isDelete # 全局逻辑删除的实体字段名
