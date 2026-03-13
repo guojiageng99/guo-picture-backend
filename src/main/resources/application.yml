@@ -24,18 +24,7 @@ spring:
     multipart:
       max-file-size: 10MB
 
-  # Redis 配置   SSH方式连接
-  redis:
-    host: localhost        # 因为用了 SSH 隧道，所以是 localhost
-    port: 6379
-    password: 123456   # 你在 redis.conf 中设置的密码
-    timeout: 2000ms
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 0
-        max-wait: -1ms
+
 
   # 空间图片分表
   shardingsphere:
@@ -44,7 +33,7 @@ spring:
       yu_picture:
         type: com.zaxxer.hikari.HikariDataSource
         driver-class-name: com.mysql.cj.jdbc.Driver
-        url: jdbc:mysql://localhost:3306/yu_picture
+        url: jdbc:mysql://49.232.171.218:3306/yu_picture
         username: root
         password: 123456
     rules:
@@ -61,7 +50,7 @@ spring:
             type: CLASS_BASED
             props:
               strategy: standard
-              algorithmClassName: com.yupi.yupicturebackend.manager.sharding.PictureShardingAlgorithm
+              algorithmClassName: com.guo.guopicturebackend.manager.sharding.PictureShardingAlgorithm
     props:
       sql-show: true
 

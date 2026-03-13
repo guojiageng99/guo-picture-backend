@@ -46,6 +46,7 @@ public class SpaceServiceImpl extends ServiceImpl<SpaceMapper, Space>
     private UserService userService;
 
     @Resource
+    @Lazy
     private SpaceUserService spaceUserService;
 
     @Resource

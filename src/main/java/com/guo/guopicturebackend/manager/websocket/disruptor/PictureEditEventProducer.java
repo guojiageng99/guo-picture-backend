@@ -5,6 +5,7 @@ import com.guo.guopicturebackend.model.entity.User;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -16,6 +17,7 @@ import javax.annotation.Resource;
 public class PictureEditEventProducer {
 
     @Resource
+    @Lazy // 新增这一行！！！
     Disruptor<PictureEditEvent> pictureEditEventDisruptor;
 
     public void publishEvent(PictureEditRequestMessage pictureEditRequestMessage, WebSocketSession session, User user, Long pictureId) {

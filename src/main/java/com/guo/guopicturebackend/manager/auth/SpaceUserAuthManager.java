@@ -46,9 +46,6 @@ public class SpaceUserAuthManager {
     private UserService userService;
 
     @Resource
-    private SpaceUserAuthManager spaceUserAuthManager;
-
-    @Resource
     private PictureService pictureService;
 
     @Resource
@@ -126,7 +123,7 @@ public class SpaceUserAuthManager {
             return new ArrayList<>();
         }
         // 管理员权限，表示权限校验通过
-        List<String> ADMIN_PERMISSIONS = spaceUserAuthManager.getPermissionsByRole(SpaceRoleEnum.ADMIN.getValue());
+        List<String> ADMIN_PERMISSIONS = this.getPermissionsByRole(SpaceRoleEnum.ADMIN.getValue());
         // 获取上下文对象
         SpaceUserAuthContext authContext = getAuthContextByRequest();
         // 如果所有字段都为空，表示查询公共图库，可以通过
@@ -142,7 +139,7 @@ public class SpaceUserAuthManager {
         // 优先从上下文中获取 SpaceUser 对象
         SpaceUser spaceUser = authContext.getSpaceUser();
         if (spaceUser != null) {
-            return spaceUserAuthManager.getPermissionsByRole(spaceUser.getSpaceRole());
+            return this.getPermissionsByRole(spaceUser.getSpaceRole());
         }
         // 如果有 spaceUserId，必然是团队空间，通过数据库查询 SpaceUser 对象
         Long spaceUserId = authContext.getSpaceUserId();
@@ -160,7 +157,7 @@ public class SpaceUserAuthManager {
                 return new ArrayList<>();
             }
             // 这里会导致管理员在私有空间没有权限，可以再查一次库处理
-            return spaceUserAuthManager.getPermissionsByRole(loginSpaceUser.getSpaceRole());
+            return this.getPermissionsByRole(loginSpaceUser.getSpaceRole());
         }
         // 如果没有 spaceUserId，尝试通过 spaceId 或 pictureId 获取 Space 对象并处理
         Long spaceId = authContext.getSpaceId();
@@ -211,7 +208,7 @@ public class SpaceUserAuthManager {
             if (spaceUser == null) {
                 return new ArrayList<>();
             }
-            return spaceUserAuthManager.getPermissionsByRole(spaceUser.getSpaceRole());
+            return this.getPermissionsByRole(spaceUser.getSpaceRole());
         }
     }
 
