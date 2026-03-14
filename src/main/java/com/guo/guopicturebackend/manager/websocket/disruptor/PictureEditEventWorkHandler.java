@@ -1,7 +1,7 @@
 package com.guo.guopicturebackend.manager.websocket.disruptor;
 
 import cn.hutool.json.JSONUtil;
-import com.guo.guopicturebackend.manager.websocket.model.PictureEditHandler;
+import com.guo.guopicturebackend.manager.websocket.PictureEditHandler;
 import com.guo.guopicturebackend.manager.websocket.model.PictureEditMessageTypeEnum;
 import com.guo.guopicturebackend.manager.websocket.model.PictureEditRequestMessage;
 import com.guo.guopicturebackend.manager.websocket.model.PictureEditResponseMessage;

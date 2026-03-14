@@ -186,12 +186,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         String sortField = userQueryRequest.getSortField();
         String sortOrder = userQueryRequest.getSortOrder();
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq(ObjUtil.isNotNull(id), "id", id);
+        // 修复：只有当 id 不为 null 且大于 0 时才添加 id 条件（避免 id=0 被当作有效条件）
+        queryWrapper.eq(ObjUtil.isNotNull(id) && id > 0, "id", id);
         queryWrapper.eq(StrUtil.isNotBlank(userRole), "userRole", userRole);
         queryWrapper.like(StrUtil.isNotBlank(userAccount), "userAccount", userAccount);
         queryWrapper.like(StrUtil.isNotBlank(userName), "userName", userName);
         queryWrapper.like(StrUtil.isNotBlank(userProfile), "userProfile", userProfile);
-        queryWrapper.orderBy(StrUtil.isNotEmpty(sortField), sortOrder.equals("ascend"), sortField);
+        // 修复排序逻辑：只有当 sortField 不为空时才添加排序，避免空指针异常
+        if (StrUtil.isNotBlank(sortField)) {
+            boolean isAsc = StrUtil.isNotBlank(sortOrder) && "ascend".equals(sortOrder);
+            queryWrapper.orderBy(true, isAsc, sortField);
+        } else {
+            // 默认按 id 降序排序
+            queryWrapper.orderByDesc("id");
+        }
         return queryWrapper;
     }
 
