@@ -4,15 +4,14 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.fasterxml.jackson.databind.ser.Serializers;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.guo.guopicturebackend.annotation.AuthCheck;
 import com.guo.guopicturebackend.api.aliyun.AliYunAiApi;
 import com.guo.guopicturebackend.api.aliyun.model.CreateOutPaintingTaskResponse;
 import com.guo.guopicturebackend.api.aliyun.model.GetOutPaintingTaskResponse;
-import com.guo.guopicturebackend.api.imagesearch.ImageSearchApiFacade;
-import com.guo.guopicturebackend.api.imagesearch.model.ImageSearchResult;
+import com.guo.guopicturebackend.api.imagesearch.my.ImageSearchApiFacade;
+import com.guo.guopicturebackend.api.imagesearch.my.model.ImageSearchResult;
 import com.guo.guopicturebackend.common.BaseResponse;
 import com.guo.guopicturebackend.common.DeleteRequest;
 import com.guo.guopicturebackend.common.ResultUtils;
@@ -46,7 +45,6 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -74,6 +72,10 @@ public class PictureController {
 
     @Resource
     private SpaceUserAuthManager spaceUserAuthManager;
+
+    // 在 PictureController 中注入（使用 my 包 HTTP 实现，无需 Selenium）
+    @Resource(name = "myImageSearchApiFacade")
+    private ImageSearchApiFacade imageSearchApiFacade;
 
 
     /**
@@ -173,10 +175,10 @@ public class PictureController {
         Space space = null;
         Long spaceId = picture.getSpaceId();
         if (spaceId != null) {
-            boolean hasPermission = stpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
-            ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
-//            User loginUser = userService.getLoginUser(request);
-//            pictureService.checkPictureAuth(loginUser, picture);
+//            boolean hasPermission = stpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
+//            ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
+            User loginUser = userService.getLoginUser(request);
+            pictureService.checkPictureAuth(loginUser, picture);
             space = spaceService.getById(spaceId);
             ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
         }
@@ -224,15 +226,15 @@ public class PictureController {
             pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
             pictureQueryRequest.setNullSpaceId(true);
         } else {
-            boolean hasPermission = stpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
-            ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
-//            // 私有空间
-//            User loginUser = userService.getLoginUser(request);
-//            Space space = spaceService.getById(spaceId);
-//            ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
-//            if (!loginUser.getId().equals(space.getUserId())) {
-//                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间权限");
-//            }
+//            boolean hasPermission = stpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
+//            ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
+            // 私有空间
+            User loginUser = userService.getLoginUser(request);
+            Space space = spaceService.getById(spaceId);
+            ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
+            if (!loginUser.getId().equals(space.getUserId())) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间权限");
+            }
         }
 
         // 查询数据库
@@ -392,7 +394,7 @@ public class PictureController {
     /**
      * 以图搜图
      */
-    @PostMapping("/search/picture")
+    /*@PostMapping("/search/picture")
     public BaseResponse<List<ImageSearchResult>> searchPictureByPicture(@RequestBody SearchPictureByPictureRequest searchPictureByPictureRequest) {
         ThrowUtils.throwIf(searchPictureByPictureRequest == null, ErrorCode.PARAMS_ERROR);
         Long pictureId = searchPictureByPictureRequest.getPictureId();
@@ -401,6 +403,42 @@ public class PictureController {
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
         List<ImageSearchResult> resultList = ImageSearchApiFacade.searchImage(oldPicture.getUrl());
         return ResultUtils.success(resultList);
+    }*/
+
+    /**
+     * 以图搜图核心接口
+     * 接口路径：/picture/search/picture
+     * 请求方式：POST
+     * 请求体：SearchPictureByPictureRequest（包含pictureId）
+     * 返回值：BaseResponse<List<ImageSearchResult>>（图片列表结果）
+     */
+    @PostMapping("/search/picture")
+    public BaseResponse<List<ImageSearchResult>> searchPictureByPicture(
+            @RequestBody SearchPictureByPictureRequest searchPictureByPictureRequest) {
+        // 1. 参数非空校验
+        ThrowUtils.throwIf(searchPictureByPictureRequest == null, ErrorCode.PARAMS_ERROR);
+        Long pictureId = searchPictureByPictureRequest.getPictureId();
+        // 2. 图片ID合法性校验
+        ThrowUtils.throwIf(pictureId == null || pictureId <= 0, ErrorCode.PARAMS_ERROR, "图片ID不合法");
+        // 3. 查询图片信息
+        Picture oldPicture = pictureService.getById(pictureId);
+        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR, "图片不存在");
+        // 4. 校验图片URL是否有效
+        ThrowUtils.throwIf(oldPicture.getUrl() == null || oldPicture.getUrl().isBlank(),
+                ErrorCode.OPERATION_ERROR, "图片URL为空");
+
+        try {
+            // 5. 调用门面模式核心方法，执行以图搜图
+            List<ImageSearchResult> resultList = imageSearchApiFacade.searchImage(oldPicture.getUrl());
+            log.info("以图搜图成功，pictureId={}，返回图片数量={}", pictureId, resultList.size());
+            // 6. 返回成功结果
+            return ResultUtils.success(resultList);
+        } catch (Exception e) {
+            // 7. 异常捕获与日志记录
+            log.error("以图搜图失败，pictureId={}", pictureId, e);
+            // 8. 返回统一异常结果
+            return ResultUtils.error(ErrorCode.OPERATION_ERROR, "以图搜图失败：" + e.getMessage());
+        }
     }
 
     @PostMapping("/search/color")

@@ -42,7 +42,7 @@ public class ResultUtils {
      * @param errorCode 错误码
      * @return 响应
      */
-    public static BaseResponse<?> error(ErrorCode errorCode, String message) {
+    public static <T> BaseResponse<T> error(ErrorCode errorCode, String message) {
         return new BaseResponse<>(errorCode.getCode(), null, message);
     }
 }
