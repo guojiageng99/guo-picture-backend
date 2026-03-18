@@ -16,6 +16,7 @@ import com.guo.guopicturebackend.model.entity.User;
 import com.guo.guopicturebackend.model.enums.SpaceRoleEnum;
 import com.guo.guopicturebackend.model.vo.SpaceUserVO;
 import com.guo.guopicturebackend.model.vo.SpaceVO;
+import com.guo.guopicturebackend.model.vo.UserVO;
 import com.guo.guopicturebackend.service.SpaceService;
 import com.guo.guopicturebackend.service.SpaceUserService;
 import com.guo.guopicturebackend.mapper.SpaceUserMapper;
@@ -24,6 +25,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +100,28 @@ public class SpaceUserServiceImpl extends ServiceImpl<SpaceUserMapper, SpaceUser
         queryWrapper.eq(ObjUtil.isNotEmpty(spaceRole), "spaceRole", spaceRole);
         return queryWrapper;
     }
+
+    @Override
+    public SpaceUserVO getSpaceUserVO(SpaceUser spaceUser, HttpServletRequest request) {
+        // 对象转封装类
+        SpaceUserVO spaceUserVO = SpaceUserVO.objToVo(spaceUser);
+        // 关联查询用户信息
+        Long userId = spaceUser.getUserId();
+        if (userId != null && userId > 0) {
+            User user = userService.getById(userId);
+            UserVO userVO = userService.getUserVO(user);
+            spaceUserVO.setUser(userVO);
+        }
+        // 关联查询空间信息
+        Long spaceId = spaceUser.getSpaceId();
+        if (spaceId != null && spaceId > 0) {
+            Space space = spaceService.getById(spaceId);
+            SpaceVO spaceVO = spaceService.getSpaceVO(space, request);
+            spaceUserVO.setSpace(spaceVO);
+        }
+        return spaceUserVO;
+    }
+
 
     @Override
     public List<SpaceUserVO> getSpaceUserVOList(List<SpaceUser> spaceUserList) {

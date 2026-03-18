@@ -7,6 +7,7 @@ import com.guo.guopicturebackend.model.entity.SpaceUser;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.guo.guopicturebackend.model.vo.SpaceUserVO;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**
@@ -21,6 +22,8 @@ public interface SpaceUserService extends IService<SpaceUser> {
     public void validSpaceUser(SpaceUser spaceUser, boolean add);
 
     public QueryWrapper<SpaceUser> getQueryWrapper(SpaceUserQueryRequest spaceUserQueryRequest);
+
+    public SpaceUserVO getSpaceUserVO(SpaceUser spaceUser, HttpServletRequest request);
 
     public List<SpaceUserVO> getSpaceUserVOList(List<SpaceUser> spaceUserList);
 }
