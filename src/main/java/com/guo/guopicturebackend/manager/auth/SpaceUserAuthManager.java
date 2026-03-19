@@ -168,10 +168,10 @@ public class SpaceUserAuthManager {
             if (pictureId == null) {
                 return ADMIN_PERMISSIONS;
             }
-            Picture picture = pictureService.lambdaQuery()
-                    .eq(Picture::getId, pictureId)
-                    .select(Picture::getId, Picture::getSpaceId, Picture::getUserId)
-                    .one();
+            // 分表时必须带 spaceId 条件，优先使用请求中的 spaceId
+            Long spaceIdFromRequest = authContext.getSpaceId();
+            Long spaceIdForQuery = spaceIdFromRequest != null ? spaceIdFromRequest : 0L;
+            Picture picture = pictureService.getPictureByIdAndSpaceId(pictureId, spaceIdForQuery);
             if (picture == null) {
                 throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "未找到图片信息");
             }

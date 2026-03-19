@@ -8,11 +8,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Properties;
 
-public class PictureShardingAlgorithm implements StandardShardingAlgorithm<Long> {
+public class PictureShardingAlgorithm implements StandardShardingAlgorithm<Comparable<?>> {
 
     @Override
-    public String doSharding(Collection<String> availableTargetNames, PreciseShardingValue<Long> preciseShardingValue) {
-        Long spaceId = preciseShardingValue.getValue();
+    public String doSharding(Collection<String> availableTargetNames, PreciseShardingValue<Comparable<?>> preciseShardingValue) {
+        // spaceId 可能为 Integer(0) 或 Long，需兼容两种类型避免 ClassCastException
+        Long spaceId = toLong(preciseShardingValue.getValue());
         String logicTableName = preciseShardingValue.getLogicTableName();
         // spaceId 为 null 表示查询所有图片
         if (spaceId == null) {
@@ -28,8 +29,22 @@ public class PictureShardingAlgorithm implements StandardShardingAlgorithm<Long>
     }
 
     @Override
-    public Collection<String> doSharding(Collection<String> collection, RangeShardingValue<Long> rangeShardingValue) {
+    public Collection<String> doSharding(Collection<String> collection, RangeShardingValue<Comparable<?>> rangeShardingValue) {
         return new ArrayList<>();
+    }
+
+    /** 将 Integer/Long 等数值类型安全转换为 Long，避免 ClassCastException */
+    private Long toLong(Comparable<?> value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Long) {
+            return (Long) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        return null;
     }
 
     @Override

@@ -58,19 +58,22 @@ public class WsHandshakeInterceptor implements HandshakeInterceptor {
         if (request instanceof ServletServerHttpRequest) {
             HttpServletRequest httpServletRequest = ((ServletServerHttpRequest) request).getServletRequest();
             // 从请求中获取参数
-            String pictureId = httpServletRequest.getParameter("pictureId");
-            if (StrUtil.isBlank(pictureId)) {
+            String pictureIdStr = httpServletRequest.getParameter("pictureId");
+            if (StrUtil.isBlank(pictureIdStr)) {
                 log.error("缺少图片参数，拒绝握手");
                 return false;
             }
+            Long pictureId = Long.parseLong(pictureIdStr);
+            String spaceIdStr = httpServletRequest.getParameter("spaceId");
+            Long spaceIdParam = StrUtil.isNotBlank(spaceIdStr) ? Long.parseLong(spaceIdStr) : null;
             // 获取当前登录用户
             User loginUser = userService.getLoginUser(httpServletRequest);
             if (ObjUtil.isEmpty(loginUser)) {
                 log.error("用户未登录，拒绝握手");
                 return false;
             }
-            // 校验用户是否有编辑当前图片的权限
-            Picture picture = pictureService.getById(pictureId);
+            // 校验用户是否有编辑当前图片的权限，分表时必须带 spaceId 条件
+            Picture picture = pictureService.getPictureByIdAndSpaceId(pictureId, spaceIdParam);
             if (ObjUtil.isEmpty(picture)) {
                 log.error("图片不存在，拒绝握手");
                 return false;
@@ -96,7 +99,7 @@ public class WsHandshakeInterceptor implements HandshakeInterceptor {
             // 设置用户登录信息等属性到 WebSocket 会话中
             attributes.put("user", loginUser);
             attributes.put("userId", loginUser.getId());
-            attributes.put("pictureId", Long.valueOf(pictureId)); // 记得转换为 Long 类型
+            attributes.put("pictureId", pictureId);
         }
         return true;
     }

@@ -62,8 +62,9 @@ public class SpaceAnalyzeServiceImpl extends ServiceImpl<SpaceMapper, Space>
             // 统计公共图库的资源使用
             QueryWrapper<Picture> queryWrapper = new QueryWrapper<>();
             queryWrapper.select("picSize");
+            // 分表时 spaceId 不能为 null，公共图库使用 spaceId=0
             if (!spaceUsageAnalyzeRequest.isQueryAll()) {
-                queryWrapper.isNull("spaceId");
+                queryWrapper.eq("spaceId", 0);
             }
             List<Object> pictureObjList = pictureService.getBaseMapper().selectObjs(queryWrapper);
             long usedSize = pictureObjList.stream().mapToLong(result -> result instanceof Long ? (Long) result : 0).sum();
@@ -287,10 +288,10 @@ public class SpaceAnalyzeServiceImpl extends ServiceImpl<SpaceMapper, Space>
         if (queryAll) {
             return;
         }
-        // 公共图库
+        // 公共图库，分表时 spaceId 不能为 null，使用 spaceId=0
         boolean queryPublic = spaceAnalyzeRequest.isQueryPublic();
         if (queryPublic) {
-            queryWrapper.isNull("spaceId");
+            queryWrapper.eq("spaceId", 0);
             return;
         }
         // 分析特定空间

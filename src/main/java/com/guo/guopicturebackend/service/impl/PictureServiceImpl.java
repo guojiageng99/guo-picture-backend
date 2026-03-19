@@ -6,6 +6,7 @@ import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.guo.guopicturebackend.api.aliyun.AliYunAiApi;
@@ -116,9 +117,11 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         if (pictureUploadRequest != null) {
             pictureId = pictureUploadRequest.getId();
         }
-        // 如果是更新图片，需要校验图片是否存在
+        // 如果是更新图片，需要校验图片是否存在，分表时必须带 spaceId 条件
         if (pictureId != null) {
-            Picture oldPicture = this.getById(pictureId);
+            Picture oldPicture = spaceId != null
+                    ? this.getPictureByIdAndSpaceId(pictureId, spaceId)
+                    : this.getPictureByIdAndSpaceId(pictureId, 0L);
             ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR, "图片不存在");
 //            // 仅本人或管理员可编辑
 //            if (!oldPicture.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
@@ -154,8 +157,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         UploadPictureResult uploadPictureResult = pictureUploadTemplate.uploadPicture(inputSource, uploadPathPrefix);
         // 构造要入库的图片信息
         Picture picture = new Picture();
-        // 补充设置 spaceId
-        picture.setSpaceId(spaceId);
+        // 补充设置 spaceId，分表时 spaceId 不能为 null，默认为 0 表示公共图库
+        Long spaceIdForStorage = spaceId != null ? spaceId : 0L;
+        picture.setSpaceId(spaceIdForStorage);
         picture.setUrl(uploadPictureResult.getUrl());
         picture.setThumbnailUrl(uploadPictureResult.getThumbnailUrl());
         String picName = uploadPictureResult.getPicName();
@@ -185,7 +189,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         transactionTemplate.execute(status -> {
             boolean result = this.saveOrUpdate(picture);
             ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "图片上传失败");
-            if (finalSpaceId != null) {
+            // spaceId 为 0 表示公共图库，不更新空间额度
+            if (finalSpaceId != null && finalSpaceId > 0) {
                 boolean update = spaceService.lambdaUpdate()
                         .eq(Space::getId, finalSpaceId)
                         .setSql("totalSize = totalSize + " + picture.getPicSize())
@@ -254,7 +259,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         queryWrapper.like(StrUtil.isNotBlank(reviewMessage), "reviewMessage", reviewMessage);
         queryWrapper.eq(ObjUtil.isNotEmpty(reviewerId), "reviewerId", reviewerId);
         queryWrapper.eq(ObjUtil.isNotEmpty(spaceId), "spaceId", spaceId);
-        queryWrapper.isNull(nullSpaceId, "spaceId");
+        // 分表时 spaceId 不能为 null，公共图库使用 spaceId=0；兼容历史数据 spaceId 为 NULL 的情况
+        if (nullSpaceId) {
+            queryWrapper.and(w -> w.eq("spaceId", 0).or().isNull("spaceId"));
+        }
 
         queryWrapper.ge(ObjUtil.isNotEmpty(startEditTime), "editTime", startEditTime);
         queryWrapper.lt(ObjUtil.isNotEmpty(endEditTime), "editTime", endEditTime);
@@ -337,19 +345,22 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         if (id == null || reviewStatusEnum == null || PictureReviewStatusEnum.REVIEWING.equals(reviewStatusEnum)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        // 判断是否存在
-        Picture oldPicture = this.getById(id);
+        // 判断是否存在，分表时需带 spaceId 条件，审核接口默认查公共图库
+        Long spaceId = pictureReviewRequest.getSpaceId() != null ? pictureReviewRequest.getSpaceId() : 0L;
+        Picture oldPicture = this.getPictureByIdAndSpaceId(id, spaceId);
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
         // 已是该状态
         if (oldPicture.getReviewStatus().equals(reviewStatus)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "请勿重复审核");
         }
-        // 更新审核状态
+        // 更新审核状态，附加 spaceId 条件
         Picture updatePicture = new Picture();
         BeanUtils.copyProperties(pictureReviewRequest, updatePicture);
         updatePicture.setReviewerId(loginUser.getId());
         updatePicture.setReviewTime(new Date());
-        boolean result = this.updateById(updatePicture);
+        UpdateWrapper<Picture> updateWrapper = new UpdateWrapper<>();
+        updateWrapper.eq("id", id).eq("spaceId", spaceId);
+        boolean result = this.update(updatePicture, updateWrapper);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
     }
 
@@ -449,24 +460,37 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
 
     @Override
-    public void deletePicture(long pictureId, User loginUser) {
+    public Picture getPictureByIdAndSpaceId(Long id, Long spaceId) {
+        Long spaceIdForQuery = spaceId != null ? spaceId : 0L;
+        return this.lambdaQuery()
+                .eq(Picture::getId, id)
+                .eq(Picture::getSpaceId, spaceIdForQuery)
+                .one();
+    }
+
+    @Override
+    public void deletePicture(long pictureId, Long spaceId, User loginUser) {
         ThrowUtils.throwIf(pictureId <= 0, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
+        // 分表时 spaceId 不能为 null，默认为 0 表示公共图库
+        Long spaceIdForQuery = spaceId != null ? spaceId : 0L;
         // 判断是否存在
-        Picture oldPicture = this.getById(pictureId);
+        Picture oldPicture = this.getPictureByIdAndSpaceId(pictureId, spaceIdForQuery);
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
         // 校验权限
 //        checkPictureAuth(loginUser, oldPicture);
         // 开启事务
         transactionTemplate.execute(status -> {
-            // 操作数据库
-            boolean result = this.removeById(pictureId);
+            // 操作数据库，附加 spaceId 条件
+            QueryWrapper<Picture> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("id", pictureId).eq("spaceId", spaceIdForQuery);
+            boolean result = this.remove(queryWrapper);
             ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-            // 释放额度
-            Long spaceId = oldPicture.getSpaceId();
-            if (spaceId != null) {
+            // 释放额度（spaceId 为 0 表示公共图库，不更新空间额度）
+            Long oldSpaceId = oldPicture.getSpaceId();
+            if (oldSpaceId != null && oldSpaceId > 0) {
                 boolean update = spaceService.lambdaUpdate()
-                        .eq(Space::getId, spaceId)
+                        .eq(Space::getId, oldSpaceId)
                         .setSql("totalSize = totalSize - " + oldPicture.getPicSize())
                         .setSql("totalCount = totalCount - 1")
                         .update();
@@ -492,14 +516,18 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         this.validPicture(picture);
         // 判断是否存在
         long id = pictureEditRequest.getId();
-        Picture oldPicture = this.getById(id);
+        // 分表时 spaceId 不能为 null，默认为 0 表示公共图库
+        Long spaceId = pictureEditRequest.getSpaceId() != null ? pictureEditRequest.getSpaceId() : 0L;
+        Picture oldPicture = this.getPictureByIdAndSpaceId(id, spaceId);
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
         // 校验权限
 //        checkPictureAuth(loginUser, oldPicture);
         // 补充审核参数
         this.fillReviewParams(picture, loginUser);
-        // 操作数据库
-        boolean result = this.updateById(picture);
+        // 操作数据库，附加 spaceId 条件
+        UpdateWrapper<Picture> updateWrapper = new UpdateWrapper<>();
+        updateWrapper.eq("id", id).eq("spaceId", spaceId);
+        boolean result = this.update(picture, updateWrapper);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
     }
 
@@ -620,9 +648,11 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     @Override
     public CreateOutPaintingTaskResponse createPictureOutPaintingTask(
             CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, User loginUser) {
-        // 获取图片信息
+        // 获取图片信息，分表时必须带 spaceId 条件
         Long pictureId = createPictureOutPaintingTaskRequest.getPictureId();
-        Picture picture = Optional.ofNullable(this.getById(pictureId))
+        Long spaceId = createPictureOutPaintingTaskRequest.getSpaceId() != null
+                ? createPictureOutPaintingTaskRequest.getSpaceId() : 0L;
+        Picture picture = Optional.ofNullable(this.getPictureByIdAndSpaceId(pictureId, spaceId))
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ERROR));
         // 权限校验
 //        checkPictureAuth(loginUser, picture);

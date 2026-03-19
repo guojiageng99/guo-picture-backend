@@ -10,7 +10,12 @@ public class PictureReviewRequest implements Serializable {
     /**  
      * id  
      */  
-    private Long id;  
+    private Long id;
+
+    /**
+     * 空间 id，分表时必须传递。公共图库传 0
+     */
+    private Long spaceId;
   
     /**  
      * 状态：0-待审核, 1-通过, 2-拒绝  

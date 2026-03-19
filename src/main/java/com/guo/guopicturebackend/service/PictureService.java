@@ -73,7 +73,16 @@ public interface PictureService extends IService<Picture> {
 
     public void checkPictureAuth(User loginUser, Picture picture);
 
-    public void deletePicture(long pictureId, User loginUser);
+    public void deletePicture(long pictureId, Long spaceId, User loginUser);
+
+    /**
+     * 根据 id 和 spaceId 查询图片（分表时必须带 spaceId 条件）
+     *
+     * @param id      图片 id
+     * @param spaceId 空间 id，null 时默认为 0（公共图库）
+     * @return 图片实体
+     */
+    Picture getPictureByIdAndSpaceId(Long id, Long spaceId);
 
     public void editPicture(PictureEditRequest pictureEditRequest, User loginUser);
 

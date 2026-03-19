@@ -104,7 +104,8 @@ public class PictureController {
         }
         User loginUser = userService.getLoginUser(request);
         long id = deleteRequest.getId();
-        pictureService.deletePicture(id, loginUser);
+        Long spaceId = deleteRequest.getSpaceId();
+        pictureService.deletePicture(id, spaceId, loginUser);
 //        // 判断是否存在
 //        Picture oldPicture = pictureService.getById(id);
 //        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
@@ -134,15 +135,19 @@ public class PictureController {
         picture.setTags(JSONUtil.toJsonStr(pictureUpdateRequest.getTags()));
         // 数据校验
         pictureService.validPicture(picture);
-        // 判断是否存在
+        // 判断是否存在，分表时 spaceId 不能为 null，默认为 0 表示公共图库
         long id = pictureUpdateRequest.getId();
-        Picture oldPicture = pictureService.getById(id);
+        Long spaceId = pictureUpdateRequest.getSpaceId() != null ? pictureUpdateRequest.getSpaceId() : 0L;
+        Picture oldPicture = pictureService.getPictureByIdAndSpaceId(id, spaceId);
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
         // 补充审核参数
         User loginUser = userService.getLoginUser(request);
         pictureService.fillReviewParams(picture, loginUser);
-        // 操作数据库
-        boolean result = pictureService.updateById(picture);
+        // 操作数据库，附加 spaceId 条件
+        com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<Picture> updateWrapper =
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<>();
+        updateWrapper.eq("id", id).eq("spaceId", spaceId);
+        boolean result = pictureService.update(picture, updateWrapper);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
     }
@@ -153,10 +158,10 @@ public class PictureController {
      */
     @GetMapping("/get")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Picture> getPictureById(long id, HttpServletRequest request) {
+    public BaseResponse<Picture> getPictureById(long id, Long spaceId, HttpServletRequest request) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
-        // 查询数据库
-        Picture picture = pictureService.getById(id);
+        // 查询数据库，分表时必须带 spaceId 条件
+        Picture picture = pictureService.getPictureByIdAndSpaceId(id, spaceId);
         ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR);
         // 获取封装类
         return ResultUtils.success(picture);
@@ -166,20 +171,20 @@ public class PictureController {
      * 根据 id 获取图片（封装类）
      */
     @GetMapping("/get/vo")
-    public BaseResponse<PictureVO> getPictureVOById(long id, HttpServletRequest request) {
+    public BaseResponse<PictureVO> getPictureVOById(long id, Long spaceId, HttpServletRequest request) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
-        // 查询数据库
-        Picture picture = pictureService.getById(id);
+        // 查询数据库，分表时必须带 spaceId 条件，null 时默认为 0（公共图库）
+        Picture picture = pictureService.getPictureByIdAndSpaceId(id, spaceId);
         ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR);
         // 空间权限校验
         Space space = null;
-        Long spaceId = picture.getSpaceId();
-        if (spaceId != null) {
+        Long pictureSpaceId = picture.getSpaceId();
+        if (pictureSpaceId != null && pictureSpaceId > 0) {
             boolean hasPermission = stpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
             ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
 //            User loginUser = userService.getLoginUser(request);
 //            pictureService.checkPictureAuth(loginUser, picture);
-            space = spaceService.getById(spaceId);
+            space = spaceService.getById(pictureSpaceId);
             ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
         }
         // 获取权限列表
@@ -226,15 +231,14 @@ public class PictureController {
             pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
             pictureQueryRequest.setNullSpaceId(true);
         } else {
-            boolean hasPermission = stpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
-            ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
-//            // 私有空间
-//            User loginUser = userService.getLoginUser(request);
-//            Space space = spaceService.getById(spaceId);
-//            ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
-//            if (!loginUser.getId().equals(space.getUserId())) {
-//                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间权限");
-//            }
+            // 使用 Session 鉴权：私有空间所有者、团队空间成员、管理员均可查看
+            User loginUser = userService.getLoginUser(request);
+            Space space = spaceService.getById(spaceId);
+            ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
+            List<String> permissionList = spaceUserAuthManager.getPermissionList(space, loginUser);
+            if (!permissionList.contains(SpaceUserPermissionConstant.PICTURE_VIEW)) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限查看该空间的图片");
+            }
         }
 
         // 查询数据库
@@ -420,8 +424,10 @@ public class PictureController {
         Long pictureId = searchPictureByPictureRequest.getPictureId();
         // 2. 图片ID合法性校验
         ThrowUtils.throwIf(pictureId == null || pictureId <= 0, ErrorCode.PARAMS_ERROR, "图片ID不合法");
-        // 3. 查询图片信息
-        Picture oldPicture = pictureService.getById(pictureId);
+        // 3. 查询图片信息，分表时必须带 spaceId 条件
+        Long spaceId = searchPictureByPictureRequest.getSpaceId() != null
+                ? searchPictureByPictureRequest.getSpaceId() : 0L;
+        Picture oldPicture = pictureService.getPictureByIdAndSpaceId(pictureId, spaceId);
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR, "图片不存在");
         // 4. 校验图片URL是否有效
         ThrowUtils.throwIf(oldPicture.getUrl() == null || oldPicture.getUrl().isBlank(),
