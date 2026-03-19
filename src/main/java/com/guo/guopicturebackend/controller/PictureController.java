@@ -176,19 +176,19 @@ public class PictureController {
         // 查询数据库，分表时必须带 spaceId 条件，null 时默认为 0（公共图库）
         Picture picture = pictureService.getPictureByIdAndSpaceId(id, spaceId);
         ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR);
-        // 空间权限校验
+        // 空间权限校验（与 listPictureVOByPage 一致，用 Session 鉴权，避免 StpInterface 上下文中 spaceId 缺失导致无权限）
+        User loginUser = userService.getLoginUser(request);
         Space space = null;
         Long pictureSpaceId = picture.getSpaceId();
         if (pictureSpaceId != null && pictureSpaceId > 0) {
-            boolean hasPermission = stpKit.SPACE.hasPermission(SpaceUserPermissionConstant.PICTURE_VIEW);
-            ThrowUtils.throwIf(!hasPermission, ErrorCode.NO_AUTH_ERROR);
-//            User loginUser = userService.getLoginUser(request);
-//            pictureService.checkPictureAuth(loginUser, picture);
             space = spaceService.getById(pictureSpaceId);
             ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
+            List<String> permissionList = spaceUserAuthManager.getPermissionList(space, loginUser);
+            if (!permissionList.contains(SpaceUserPermissionConstant.PICTURE_VIEW)) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限");
+            }
         }
         // 获取权限列表
-        User loginUser = userService.getLoginUser(request);
         List<String> permissionList = spaceUserAuthManager.getPermissionList(space, loginUser);
         PictureVO pictureVO = pictureService.getPictureVO(picture, request);
         pictureVO.setPermissionList(permissionList);

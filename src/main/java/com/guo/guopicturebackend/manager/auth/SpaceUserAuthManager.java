@@ -252,7 +252,11 @@ public class SpaceUserAuthManager {
                     return new ArrayList<>();
                 }
             case TEAM:
-                // 团队空间，查询 SpaceUser 并获取角色和权限
+                // 团队空间，系统管理员或空间创建者直接赋予全部权限
+                if (userService.isAdmin(loginUser) || space.getUserId().equals(loginUser.getId())) {
+                    return ADMIN_PERMISSIONS;
+                }
+                // 查询 SpaceUser 并获取角色和权限
                 SpaceUser spaceUser = spaceUserService.lambdaQuery()
                         .eq(SpaceUser::getSpaceId, space.getId())
                         .eq(SpaceUser::getUserId, loginUser.getId())
