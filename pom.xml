@@ -88,6 +88,12 @@
             <artifactId>cos_api</artifactId>
             <version>5.6.227</version>
         </dependency>
+        <!-- 腾讯混元大模型（对话 / 图片理解 ChatCompletions） -->
+        <dependency>
+            <groupId>com.tencentcloudapi</groupId>
+            <artifactId>tencentcloud-sdk-java-hunyuan</artifactId>
+            <version>3.1.1288</version>
+        </dependency>
         <!-- HTML 解析：https://jsoup.org/ -->
         <dependency>
             <groupId>org.jsoup</groupId>

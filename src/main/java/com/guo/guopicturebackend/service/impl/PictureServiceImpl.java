@@ -15,6 +15,7 @@ import com.guo.guopicturebackend.api.aliyun.model.CreateOutPaintingTaskResponse;
 import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.exception.ThrowUtils;
+import com.guo.guopicturebackend.config.HunyuanProperties;
 import com.guo.guopicturebackend.manager.CosManager;
 import com.guo.guopicturebackend.manager.FileManager;
 import com.guo.guopicturebackend.manager.upload.FilePictureUpload;
@@ -40,6 +41,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -89,6 +91,13 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     @Resource
     private PictureMetaStatService pictureMetaStatService;
+
+    @Resource
+    private HunyuanProperties hunyuanProperties;
+
+    @Lazy
+    @Resource
+    private PictureAiHunyuanFillService pictureAiHunyuanFillService;
 
     @Override
     public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
@@ -204,6 +213,12 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             }
             return picture;
         });
+
+        if (pictureId == null
+                && hunyuanProperties.isEnabled()
+                && hunyuanProperties.isAutoFillAfterUpload()) {
+            pictureAiHunyuanFillService.tryFillPictureMetadata(picture.getId(), spaceIdForStorage, picture.getUrl());
+        }
 
         return PictureVO.objToVo(picture);
     }
