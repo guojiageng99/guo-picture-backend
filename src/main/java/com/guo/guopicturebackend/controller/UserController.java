@@ -9,6 +9,7 @@ import com.guo.guopicturebackend.constant.UserConstant;
 import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.exception.ThrowUtils;
+import cn.hutool.core.util.StrUtil;
 import com.guo.guopicturebackend.model.dto.user.*;
 import com.guo.guopicturebackend.model.entity.User;
 import com.guo.guopicturebackend.model.vo.LoginUserVO;
@@ -116,6 +117,30 @@ public class UserController {
         }
         boolean b = userService.removeById(deleteRequest.getId());
         return ResultUtils.success(b);
+    }
+
+    /**
+     * 更新当前登录用户资料（昵称、头像、简介）
+     */
+    @PostMapping("/update/my")
+    public BaseResponse<Boolean> updateMyUser(@RequestBody UserUpdateMyRequest userUpdateMyRequest,
+                                              HttpServletRequest request) {
+        ThrowUtils.throwIf(userUpdateMyRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        User user = new User();
+        user.setId(loginUser.getId());
+        if (StrUtil.isNotBlank(userUpdateMyRequest.getUserName())) {
+            user.setUserName(userUpdateMyRequest.getUserName());
+        }
+        if (userUpdateMyRequest.getUserAvatar() != null) {
+            user.setUserAvatar(userUpdateMyRequest.getUserAvatar());
+        }
+        if (userUpdateMyRequest.getUserProfile() != null) {
+            user.setUserProfile(userUpdateMyRequest.getUserProfile());
+        }
+        boolean result = userService.updateById(user);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
     }
 
     /**
