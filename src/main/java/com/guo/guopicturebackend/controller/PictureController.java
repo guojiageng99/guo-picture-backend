@@ -30,7 +30,10 @@ import com.guo.guopicturebackend.model.entity.User;
 import com.guo.guopicturebackend.model.enums.PictureReviewStatusEnum;
 import com.guo.guopicturebackend.model.vo.PictureTagCategory;
 import com.guo.guopicturebackend.model.vo.PictureVO;
+import com.guo.guopicturebackend.service.PictureCategoryService;
+import com.guo.guopicturebackend.service.PictureMetaStatService;
 import com.guo.guopicturebackend.service.PictureService;
+import com.guo.guopicturebackend.service.PictureTagService;
 import com.guo.guopicturebackend.service.SpaceService;
 import com.guo.guopicturebackend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +47,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -72,6 +74,15 @@ public class PictureController {
 
     @Resource
     private SpaceUserAuthManager spaceUserAuthManager;
+
+    @Resource
+    private PictureTagService pictureTagService;
+
+    @Resource
+    private PictureCategoryService pictureCategoryService;
+
+    @Resource
+    private PictureMetaStatService pictureMetaStatService;
 
     // 在 PictureController 中注入（使用 my 包 HTTP 实现，无需 Selenium）
     @Resource(name = "myImageSearchApiFacade")
@@ -149,6 +160,12 @@ public class PictureController {
         updateWrapper.eq("id", id).eq("spaceId", spaceId);
         boolean result = pictureService.update(picture, updateWrapper);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        String newTagsJson = pictureUpdateRequest.getTags() == null
+                ? "[]"
+                : JSONUtil.toJsonStr(pictureUpdateRequest.getTags());
+        pictureMetaStatService.applyPictureMetadataDelta(
+                oldPicture.getCategory(), oldPicture.getTags(),
+                pictureUpdateRequest.getCategory(), newTagsJson);
         return ResultUtils.success(true);
     }
 
@@ -288,10 +305,10 @@ public class PictureController {
     @GetMapping("/tag_category")
     public BaseResponse<PictureTagCategory> listPictureTagCategory() {
         PictureTagCategory pictureTagCategory = new PictureTagCategory();
-        List<String> tagList = Arrays.asList("热门", "搞笑", "生活", "高清", "艺术", "校园", "背景", "简历", "创意");
-        List<String> categoryList = Arrays.asList("模板", "电商", "表情包", "素材", "海报");
-        pictureTagCategory.setTagList(tagList);
-        pictureTagCategory.setCategoryList(categoryList);
+        pictureTagCategory.setTagList(pictureTagService.listAllTagNamesForPicker());
+        pictureTagCategory.setCategoryList(pictureCategoryService.listAllCategoryNamesForPicker());
+        pictureTagCategory.setPopularTagList(pictureTagService.listPopularTagNames(10));
+        pictureTagCategory.setPopularCategoryList(pictureCategoryService.listPopularCategoryNames(6));
         return ResultUtils.success(pictureTagCategory);
     }
 

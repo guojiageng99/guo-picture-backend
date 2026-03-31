@@ -28,6 +28,7 @@ import com.guo.guopicturebackend.model.entity.User;
 import com.guo.guopicturebackend.model.enums.PictureReviewStatusEnum;
 import com.guo.guopicturebackend.model.vo.PictureVO;
 import com.guo.guopicturebackend.model.vo.UserVO;
+import com.guo.guopicturebackend.service.PictureMetaStatService;
 import com.guo.guopicturebackend.service.PictureService;
 import com.guo.guopicturebackend.mapper.PictureMapper;
 import com.guo.guopicturebackend.service.SpaceService;
@@ -85,6 +86,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     @Resource
     private AliYunAiApi aliYunAiApi;
+
+    @Resource
+    private PictureMetaStatService pictureMetaStatService;
 
     @Override
     public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
@@ -486,6 +490,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             queryWrapper.eq("id", pictureId).eq("spaceId", spaceIdForQuery);
             boolean result = this.remove(queryWrapper);
             ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+            pictureMetaStatService.applyPictureMetadataDelta(
+                    oldPicture.getCategory(), oldPicture.getTags(), null, "[]");
             // 释放额度（spaceId 为 0 表示公共图库，不更新空间额度）
             Long oldSpaceId = oldPicture.getSpaceId();
             if (oldSpaceId != null && oldSpaceId > 0) {
@@ -509,7 +515,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         Picture picture = new Picture();
         BeanUtils.copyProperties(pictureEditRequest, picture);
         // 注意将 list 转为 string
-        picture.setTags(JSONUtil.toJsonStr(pictureEditRequest.getTags()));
+        picture.setTags(pictureEditRequest.getTags() == null
+                ? "[]"
+                : JSONUtil.toJsonStr(pictureEditRequest.getTags()));
         // 设置编辑时间
         picture.setEditTime(new Date());
         // 数据校验
@@ -529,6 +537,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         updateWrapper.eq("id", id).eq("spaceId", spaceId);
         boolean result = this.update(picture, updateWrapper);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        pictureMetaStatService.applyPictureMetadataDelta(
+                oldPicture.getCategory(), oldPicture.getTags(),
+                picture.getCategory(), picture.getTags());
     }
 
 
@@ -595,9 +606,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间访问权限");
         }
 
-        // 3. 查询指定图片，仅选择需要的字段
+        // 3. 查询完整记录（用于统计 usage 差量）
         List<Picture> pictureList = this.lambdaQuery()
-                .select(Picture::getId, Picture::getSpaceId)
                 .eq(Picture::getSpaceId, spaceId)
                 .in(Picture::getId, pictureIdList)
                 .list();
@@ -605,22 +615,42 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         if (pictureList.isEmpty()) {
             return;
         }
-        // 4. 更新分类和标签
-        pictureList.forEach(picture -> {
+        List<PictureMetaDelta> deltas = new ArrayList<>();
+        for (Picture picture : pictureList) {
+            String oldC = picture.getCategory();
+            String oldT = picture.getTags();
+            String newC = StrUtil.isNotBlank(category) ? category.trim() : oldC;
+            String newT = CollUtil.isNotEmpty(tags) ? JSONUtil.toJsonStr(tags) : oldT;
             if (StrUtil.isNotBlank(category)) {
-                picture.setCategory(category);
+                picture.setCategory(category.trim());
             }
             if (CollUtil.isNotEmpty(tags)) {
                 picture.setTags(JSONUtil.toJsonStr(tags));
             }
-        });
+            deltas.add(new PictureMetaDelta(oldC, oldT, newC, newT));
+        }
 
-        // 批量重命名
         String nameRule = pictureEditByBatchRequest.getNameRule();
         fillPictureWithNameRule(pictureList, nameRule);
-        // 5. 批量更新
         boolean result = this.updateBatchById(pictureList);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        for (PictureMetaDelta d : deltas) {
+            pictureMetaStatService.applyPictureMetadataDelta(d.oldCategory, d.oldTagsJson, d.newCategory, d.newTagsJson);
+        }
+    }
+
+    private static final class PictureMetaDelta {
+        final String oldCategory;
+        final String oldTagsJson;
+        final String newCategory;
+        final String newTagsJson;
+
+        PictureMetaDelta(String oldCategory, String oldTagsJson, String newCategory, String newTagsJson) {
+            this.oldCategory = oldCategory;
+            this.oldTagsJson = oldTagsJson;
+            this.newCategory = newCategory;
+            this.newTagsJson = newTagsJson;
+        }
     }
 
     /**

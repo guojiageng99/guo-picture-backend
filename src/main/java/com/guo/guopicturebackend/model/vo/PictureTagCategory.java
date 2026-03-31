@@ -19,4 +19,14 @@ public class PictureTagCategory {
      * 分类列表
      */
     private List<String> categoryList;
+
+    /**
+     * 热门标签（按 usage_count）
+     */
+    private List<String> popularTagList;
+
+    /**
+     * 热门分类（按 usage_count）
+     */
+    private List<String> popularCategoryList;
 }
