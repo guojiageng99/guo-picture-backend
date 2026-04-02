@@ -116,6 +116,16 @@ public class Picture implements Serializable {
     private Date reviewTime;
 
     /**
+     * AI 内容初审：0 未出结果 1 通过 2 拒绝
+     */
+    private Integer aiReviewStatus;
+
+    /**
+     * AI 审核说明
+     */
+    private String aiReviewMessage;
+
+    /**
      * 缩略图 url
      */
     private String thumbnailUrl;

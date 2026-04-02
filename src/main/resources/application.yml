@@ -52,5 +52,27 @@ knife4j:
         api-rule-resources:
           - com.guo.guopicturebackend.controller
 
+# 腾讯混元（密钥见 application-local.yml；此处为默认占位）
+tencent:
+  hunyuan:
+    enabled: false
+    secret-id: ""
+    secret-key: ""
+    region: ap-guangzhou
+    model: hunyuan-vision
+    auto-fill-after-upload: false
+    ai-review-enabled: false
+
+# 邮件（配置 host/username/password 后发送审核结果；不配则无 JavaMailSender，仅站内信）
+# spring:
+#   mail:
+#     host: smtp.qq.com
+#     port: 587
+#     username: your@qq.com
+#     password: 授权码
+#     properties:
+#       mail.smtp.auth: true
+#       mail.smtp.starttls.enable: true
+#       mail.smtp.starttls.required: true
 
 

@@ -21,14 +21,17 @@ import java.util.stream.Collectors;
 public interface UserService extends IService<User> {
 
     /**
-     * 用户注册
+     * 用户注册（须填写手机号、邮箱）
      *
      * @param userAccount   用户账户
      * @param userPassword  用户密码
      * @param checkPassword 校验密码
+     * @param userPhone     手机号
+     * @param userEmail     邮箱
      * @return 新用户 id
      */
-    long userRegister(String userAccount, String userPassword, String checkPassword);
+    long userRegister(String userAccount, String userPassword, String checkPassword,
+                      String userPhone, String userEmail);
 
 
     public String getEncryptPassword(String userPassword);

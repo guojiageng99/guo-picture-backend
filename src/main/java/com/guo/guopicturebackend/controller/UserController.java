@@ -38,7 +38,9 @@ public class UserController {
         String userAccount = userRegisterRequest.getUserAccount();
         String userPassword = userRegisterRequest.getUserPassword();
         String checkPassword = userRegisterRequest.getCheckPassword();
-        long result = userService.userRegister(userAccount, userPassword, checkPassword);
+        String userPhone = userRegisterRequest.getUserPhone();
+        String userEmail = userRegisterRequest.getUserEmail();
+        long result = userService.userRegister(userAccount, userPassword, checkPassword, userPhone, userEmail);
         return ResultUtils.success(result);
     }
 
@@ -75,6 +77,12 @@ public class UserController {
         ThrowUtils.throwIf(userAddRequest == null, ErrorCode.PARAMS_ERROR);
         User user = new User();
         BeanUtils.copyProperties(userAddRequest, user);
+        if (StrUtil.isNotBlank(user.getUserEmail())) {
+            user.setUserEmail(user.getUserEmail().trim().toLowerCase());
+        }
+        if (StrUtil.isNotBlank(user.getUserPhone())) {
+            user.setUserPhone(user.getUserPhone().trim());
+        }
         // 默认密码 12345678
         final String DEFAULT_PASSWORD = "12345678";
         String encryptPassword = userService.getEncryptPassword(DEFAULT_PASSWORD);
@@ -154,6 +162,12 @@ public class UserController {
         }
         User user = new User();
         BeanUtils.copyProperties(userUpdateRequest, user);
+        if (StrUtil.isNotBlank(user.getUserEmail())) {
+            user.setUserEmail(user.getUserEmail().trim().toLowerCase());
+        }
+        if (StrUtil.isNotBlank(user.getUserPhone())) {
+            user.setUserPhone(user.getUserPhone().trim());
+        }
         boolean result = userService.updateById(user);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);

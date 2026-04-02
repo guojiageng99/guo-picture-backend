@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.guo.guopicturebackend.config.HunyuanProperties;
 import com.guo.guopicturebackend.model.dto.hunyuan.ChatTopicInfoCategory;
+import com.guo.guopicturebackend.model.dto.hunyuan.PictureModerationResult;
 import com.guo.guopicturebackend.service.PictureCategoryService;
 import com.guo.guopicturebackend.service.PictureTagService;
 import com.tencentcloudapi.common.Credential;
@@ -31,6 +32,10 @@ import java.util.List;
 @Slf4j
 public class HunyuanManager {
 
+    private static final String MODERATION_PROMPT = "你是图片内容安全审核员。判断该图是否适合在公开图库展示（禁止色情、暴力血腥、违禁、明显侵权标识等）。"
+            + "只输出一个 JSON 对象，不要 markdown，不要其它文字。格式：{\"pass\":true或false,\"reason\":\"简短中文理由\"}。"
+            + "若有任何不确定，pass 请填 true 交由人工复核。";
+
     @Resource
     private HunyuanProperties hunyuanProperties;
 
@@ -44,40 +49,37 @@ public class HunyuanManager {
      * 调用混元理解图片，返回第一条 choice（与教程一致）
      */
     public Choice getChatTopicInfo(String imgUrl) throws TencentCloudSDKException {
-        if (!hunyuanProperties.isEnabled()
-                || StrUtil.hasBlank(hunyuanProperties.getSecretId(), hunyuanProperties.getSecretKey())
-                || StrUtil.isBlank(imgUrl)) {
+        if (!canCallVision(imgUrl)) {
             return null;
         }
-        Credential cred = new Credential(hunyuanProperties.getSecretId(), hunyuanProperties.getSecretKey());
-        HttpProfile httpProfile = new HttpProfile();
-        httpProfile.setEndpoint("hunyuan.tencentcloudapi.com");
-        ClientProfile clientProfile = new ClientProfile();
-        clientProfile.setHttpProfile(httpProfile);
-        HunyuanClient client = new HunyuanClient(cred, hunyuanProperties.getRegion(), clientProfile);
+        return visionChat(imgUrl, buildVisionPrompt());
+    }
 
-        ChatCompletionsRequest req = new ChatCompletionsRequest();
-        req.setModel(hunyuanProperties.getModel());
-        req.setStream(false);
-
-        Message userMsg = new Message();
-        userMsg.setRole("user");
-        Content textPart = new Content();
-        textPart.setType("text");
-        textPart.setText(buildVisionPrompt());
-        Content imagePart = new Content();
-        imagePart.setType("image_url");
-        ImageUrl iu = new ImageUrl();
-        iu.setUrl(imgUrl);
-        imagePart.setImageUrl(iu);
-        userMsg.setContents(new Content[]{textPart, imagePart});
-
-        req.setMessages(new Message[]{userMsg});
-        ChatCompletionsResponse resp = client.ChatCompletions(req);
-        if (resp.getChoices() == null || resp.getChoices().length == 0) {
+    /**
+     * 图片内容初审（JSON：pass / reason）
+     */
+    public PictureModerationResult moderatePictureByUrl(String imgUrl) {
+        if (!canCallVision(imgUrl)) {
             return null;
         }
-        return resp.getChoices()[0];
+        try {
+            Choice choice = visionChat(imgUrl, MODERATION_PROMPT);
+            if (choice == null || choice.getMessage() == null) {
+                return null;
+            }
+            String content = choice.getMessage().getContent();
+            if (StrUtil.isBlank(content)) {
+                return null;
+            }
+            String json = stripMarkdownCodeFence(content.trim());
+            return JSONUtil.toBean(json, PictureModerationResult.class);
+        } catch (TencentCloudSDKException e) {
+            log.error("混元 AI 审核 API 失败, imgUrl={}", imgUrl, e);
+            return null;
+        } catch (Exception e) {
+            log.error("混元 AI 审核解析失败, imgUrl={}", imgUrl, e);
+            return null;
+        }
     }
 
     /**
@@ -106,6 +108,48 @@ public class HunyuanManager {
             log.error("混元话题信息解析失败, imgUrl={}", imgUrl, e);
             return null;
         }
+    }
+
+    private boolean canCallVision(String imgUrl) {
+        return hunyuanProperties.isEnabled()
+                && StrUtil.isNotBlank(hunyuanProperties.getSecretId())
+                && StrUtil.isNotBlank(hunyuanProperties.getSecretKey())
+                && StrUtil.isNotBlank(imgUrl);
+    }
+
+    private HunyuanClient newHunyuanClient() throws TencentCloudSDKException {
+        Credential cred = new Credential(hunyuanProperties.getSecretId(), hunyuanProperties.getSecretKey());
+        HttpProfile httpProfile = new HttpProfile();
+        httpProfile.setEndpoint("hunyuan.tencentcloudapi.com");
+        ClientProfile clientProfile = new ClientProfile();
+        clientProfile.setHttpProfile(httpProfile);
+        return new HunyuanClient(cred, hunyuanProperties.getRegion(), clientProfile);
+    }
+
+    private Choice visionChat(String imgUrl, String textPrompt) throws TencentCloudSDKException {
+        HunyuanClient client = newHunyuanClient();
+        ChatCompletionsRequest req = new ChatCompletionsRequest();
+        req.setModel(hunyuanProperties.getModel());
+        req.setStream(false);
+
+        Message userMsg = new Message();
+        userMsg.setRole("user");
+        Content textPart = new Content();
+        textPart.setType("text");
+        textPart.setText(textPrompt);
+        Content imagePart = new Content();
+        imagePart.setType("image_url");
+        ImageUrl iu = new ImageUrl();
+        iu.setUrl(imgUrl);
+        imagePart.setImageUrl(iu);
+        userMsg.setContents(new Content[]{textPart, imagePart});
+
+        req.setMessages(new Message[]{userMsg});
+        ChatCompletionsResponse resp = client.ChatCompletions(req);
+        if (resp.getChoices() == null || resp.getChoices().length == 0) {
+            return null;
+        }
+        return resp.getChoices()[0];
     }
 
     private String buildVisionPrompt() {

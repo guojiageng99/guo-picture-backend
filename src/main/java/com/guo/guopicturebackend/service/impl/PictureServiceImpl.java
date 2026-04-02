@@ -30,6 +30,7 @@ import com.guo.guopicturebackend.model.enums.PictureReviewStatusEnum;
 import com.guo.guopicturebackend.model.vo.PictureVO;
 import com.guo.guopicturebackend.model.vo.UserVO;
 import com.guo.guopicturebackend.service.PictureMetaStatService;
+import com.guo.guopicturebackend.service.PictureReviewNotifyService;
 import com.guo.guopicturebackend.service.PictureService;
 import com.guo.guopicturebackend.mapper.PictureMapper;
 import com.guo.guopicturebackend.service.SpaceService;
@@ -98,6 +99,13 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     @Lazy
     @Resource
     private PictureAiHunyuanFillService pictureAiHunyuanFillService;
+
+    @Lazy
+    @Resource
+    private PictureAiModerationService pictureAiModerationService;
+
+    @Resource
+    private PictureReviewNotifyService pictureReviewNotifyService;
 
     @Override
     public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
@@ -218,6 +226,12 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
                 && hunyuanProperties.isEnabled()
                 && hunyuanProperties.isAutoFillAfterUpload()) {
             pictureAiHunyuanFillService.tryFillPictureMetadata(picture.getId(), spaceIdForStorage, picture.getUrl());
+        }
+
+        if (!userService.isAdmin(loginUser)
+                && hunyuanProperties.isEnabled()
+                && hunyuanProperties.isAiReviewEnabled()) {
+            pictureAiModerationService.scheduleAfterUpload(picture.getId(), spaceIdForStorage, picture.getUrl());
         }
 
         return PictureVO.objToVo(picture);
@@ -381,6 +395,14 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         updateWrapper.eq("id", id).eq("spaceId", spaceId);
         boolean result = this.update(updatePicture, updateWrapper);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+
+        String msg = pictureReviewRequest.getReviewMessage();
+        if (StrUtil.isBlank(msg)) {
+            msg = PictureReviewStatusEnum.PASS.equals(reviewStatusEnum)
+                    ? "管理员审核通过"
+                    : "审核未通过";
+        }
+        pictureReviewNotifyService.notifyOwner(oldPicture, reviewStatusEnum, msg);
     }
 
     @Override

@@ -102,6 +102,27 @@ public class PictureVO implements Serializable {
      * 空间 id
      */
     private Long spaceId;
+
+    /**
+     * 审核状态：0-待审核; 1-通过; 2-拒绝
+     */
+    private Integer reviewStatus;
+
+    /**
+     * 审核说明
+     */
+    private String reviewMessage;
+
+    /**
+     * AI 初审：0 待/无 1 通过 2 拒绝
+     */
+    private Integer aiReviewStatus;
+
+    /**
+     * AI 审核说明
+     */
+    private String aiReviewMessage;
+
     /**
      * 图片主色调
      */

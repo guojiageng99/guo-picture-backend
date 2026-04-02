@@ -23,4 +23,14 @@ public class UserRegisterRequest implements Serializable {
      * 确认密码
      */
     private String checkPassword;
+
+    /**
+     * 手机号（中国大陆 11 位）
+     */
+    private String userPhone;
+
+    /**
+     * 邮箱
+     */
+    private String userEmail;
 }
