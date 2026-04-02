@@ -14,7 +14,7 @@ import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.exception.ThrowUtils;
 import com.guo.guopicturebackend.model.dto.file.UploadPictureResult;
-import com.qcloud.cos.model.PutObjectResult;
+import com.qcloud.cos.model.UploadResult;
 import com.qcloud.cos.model.ciModel.persistence.ImageInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -64,8 +64,8 @@ public class FileManager {
             file = File.createTempFile(uploadPath, null);
             multipartFile.transferTo(file);
             // 上传图片
-            PutObjectResult putObjectResult = cosManager.putPictureObject(uploadPath, file);
-            ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
+            UploadResult uploadResult = cosManager.putPictureObject(uploadPath, file);
+            ImageInfo imageInfo = uploadResult.getCiUploadResult().getOriginalInfo().getImageInfo();
             // 封装返回结果
             UploadPictureResult uploadPictureResult = new UploadPictureResult();
             int picWidth = imageInfo.getWidth();
@@ -139,8 +139,8 @@ public class FileManager {
             HttpUtil.downloadFile(fileUrl, file);
             // 上传图片
             // ... 其余代码保持不变
-            PutObjectResult putObjectResult = cosManager.putPictureObject(uploadPath, file);
-            ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
+            UploadResult uploadResult = cosManager.putPictureObject(uploadPath, file);
+            ImageInfo imageInfo = uploadResult.getCiUploadResult().getOriginalInfo().getImageInfo();
             // 封装返回结果
             UploadPictureResult uploadPictureResult = new UploadPictureResult();
             int picWidth = imageInfo.getWidth();

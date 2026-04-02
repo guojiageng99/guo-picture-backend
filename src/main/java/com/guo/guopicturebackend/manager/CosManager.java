@@ -8,7 +8,10 @@ import com.qcloud.cos.model.COSObject;
 import com.qcloud.cos.model.GetObjectRequest;
 import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.model.PutObjectResult;
+import com.qcloud.cos.model.UploadResult;
 import com.qcloud.cos.model.ciModel.persistence.PicOperations;
+import com.qcloud.cos.transfer.TransferManager;
+import com.qcloud.cos.transfer.Upload;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -17,98 +20,94 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
-public class CosManager {  
-  
+public class CosManager {
+
     @Resource
     private CosClientConfig cosClientConfig;
-  
-    @Resource  
-    private COSClient cosClient;
-  
-    // ... 一些操作 COS 的方法
 
+    @Resource
+    private COSClient cosClient;
+
+    @Resource
+    private TransferManager transferManager;
 
     /**
-     * 上传对象
-     *
-     * @param key  唯一键
-     * @param file 文件
+     * 上传对象（大文件走 TransferManager 自动分片）
      */
-    public PutObjectResult putObject(String key, File file) {
-        PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key,
-                file);
-        return cosClient.putObject(putObjectRequest);
+    public void putObject(String key, File file) {
+        PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key, file);
+        if (file.length() < cosClientConfig.getMultipartUploadThreshold()) {
+            cosClient.putObject(putObjectRequest);
+            return;
+        }
+        try {
+            Upload upload = transferManager.upload(putObjectRequest);
+            upload.waitForCompletion();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CosClientException("上传被中断", e);
+        }
     }
 
-
-    /**
-     * 下载对象
-     *
-     * @param key 唯一键
-     */
     public COSObject getObject(String key) {
         GetObjectRequest getObjectRequest = new GetObjectRequest(cosClientConfig.getBucket(), key);
         return cosClient.getObject(getObjectRequest);
     }
 
-
-
     /**
-     * 上传对象（附带图片信息）
-     *
-     * @param key  唯一键
-     * @param file 文件
+     * 上传图片（数据万象处理）；超过阈值时使用 TransferManager 分片上传，结果含 CI 信息。
      */
-    public PutObjectResult putPictureObject(String key, File file) {
-        PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key,
-                file);
-        // 对图片进行处理（获取基本信息也被视作为一种处理）
+    public UploadResult putPictureObject(String key, File file) {
+        PutObjectRequest putObjectRequest = buildPicturePutRequest(key, file);
+        try {
+            if (file.length() < cosClientConfig.getMultipartUploadThreshold()) {
+                PutObjectResult pr = cosClient.putObject(putObjectRequest);
+                return toUploadResult(pr, key);
+            }
+            Upload upload = transferManager.upload(putObjectRequest);
+            return upload.waitForUploadResult();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CosClientException("上传被中断", e);
+        }
+    }
+
+    private PutObjectRequest buildPicturePutRequest(String key, File file) {
+        PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key, file);
         PicOperations picOperations = new PicOperations();
-        // 1 表示返回原图信息
         picOperations.setIsPicInfo(1);
         List<PicOperations.Rule> rules = new ArrayList<>();
-        // 图片压缩（转成 webp 格式）
         String webpKey = FileUtil.mainName(key) + ".webp";
         PicOperations.Rule compressRule = new PicOperations.Rule();
         compressRule.setRule("imageMogr2/format/webp");
         compressRule.setBucket(cosClientConfig.getBucket());
         compressRule.setFileId(webpKey);
         rules.add(compressRule);
-        // 缩略图处理，仅对 > 20 KB 的图片生成缩略图
         if (file.length() > 2 * 1024) {
             PicOperations.Rule thumbnailRule = new PicOperations.Rule();
             thumbnailRule.setBucket(cosClientConfig.getBucket());
             String thumbnailKey = FileUtil.mainName(key) + "_thumbnail." + FileUtil.getSuffix(key);
             thumbnailRule.setFileId(thumbnailKey);
-            // 缩放规则 /thumbnail/<Width>x<Height>>（如果大于原图宽高，则不处理）
             thumbnailRule.setRule(String.format("imageMogr2/thumbnail/%sx%s>", 128, 128));
             rules.add(thumbnailRule);
         }
-        // 构造处理参数
         picOperations.setRules(rules);
         putObjectRequest.setPicOperations(picOperations);
-        return cosClient.putObject(putObjectRequest);
+        return putObjectRequest;
     }
 
+    private static UploadResult toUploadResult(PutObjectResult pr, String key) {
+        UploadResult ur = new UploadResult();
+        ur.setKey(key);
+        ur.setRequestId(pr.getRequestId());
+        ur.setDateStr(pr.getDateStr());
+        ur.setETag(pr.getETag());
+        ur.setCrc64Ecma(pr.getCrc64Ecma());
+        ur.setCiUploadResult(pr.getCiUploadResult());
+        return ur;
+    }
 
-
-    /**
-     * 删除对象
-     *
-     * @param key 文件 key
-     */
     public void deleteObject(String key) throws CosClientException {
         cosClient.deleteObject(cosClientConfig.getBucket(), key);
     }
-
-   /* public PutObjectResult putPictureObject(String key, File file){
-        PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key, file);
-        PicOperations picOperations = new PicOperations();
-        picOperations.setIsPicInfo(1);
-        putObjectRequest.setPicOperations(picOperations);
-        return cosClient.putObject(putObjectRequest);
-    }*/
-
-
-
 }

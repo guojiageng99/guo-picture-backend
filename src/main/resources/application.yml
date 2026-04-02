@@ -19,10 +19,11 @@ spring:
 
 
 
-  # 开放更大的文件上传体积
+  # 开放更大的文件上传体积（分片接口单块可较大，按需调大）
   servlet:
     multipart:
-      max-file-size: 10MB
+      max-file-size: 128MB
+      max-request-size: 128MB
 
 
 
@@ -60,6 +61,10 @@ picture:
     list-redis-ttl-jitter-seconds: 300
     hot-access-threshold: 40
     hot-window-seconds: 120
+
+# COS TransferManager 分片阈值（与 CosClientConfig 一致，可选）
+# cos.client.multipart-upload-threshold: 5242880
+# cos.client.minimum-upload-part-size: 1048576
 
 tencent:
   hunyuan:

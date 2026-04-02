@@ -10,7 +10,7 @@ import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.manager.CosManager;
 import com.guo.guopicturebackend.model.dto.file.UploadPictureResult;
-import com.qcloud.cos.model.PutObjectResult;
+import com.qcloud.cos.model.UploadResult;
 import com.qcloud.cos.model.ciModel.persistence.CIObject;
 import com.qcloud.cos.model.ciModel.persistence.ImageInfo;
 import com.qcloud.cos.model.ciModel.persistence.ProcessResults;
@@ -52,9 +52,9 @@ public abstract class PictureUploadTemplate {
             processFile(inputSource, file);  
   
             // 4. 上传图片到对象存储  
-            PutObjectResult putObjectResult = cosManager.putPictureObject(uploadPath, file);
-            ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
-            ProcessResults processResults = putObjectResult.getCiUploadResult().getProcessResults();
+            UploadResult uploadResult = cosManager.putPictureObject(uploadPath, file);
+            ImageInfo imageInfo = uploadResult.getCiUploadResult().getOriginalInfo().getImageInfo();
+            ProcessResults processResults = uploadResult.getCiUploadResult().getProcessResults();
             List<CIObject> objectList = processResults.getObjectList();
             if (CollUtil.isNotEmpty(objectList)){
                 CIObject compressedCiObject = objectList.get(0);
