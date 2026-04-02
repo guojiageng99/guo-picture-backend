@@ -41,21 +41,24 @@ public class PictureAiModerationService {
     @Async
     public void scheduleAfterUpload(Long pictureId, Long spaceId, String imageUrl) {
         if (!hunyuanProperties.isEnabled() || !hunyuanProperties.isAiReviewEnabled()) {
+            log.debug("[AI初审] 未执行：需 tencent.hunyuan.enabled=true 且 ai-review-enabled=true，pictureId={}", pictureId);
             return;
         }
         if (pictureId == null || StrUtil.isBlank(imageUrl)) {
             return;
         }
         long sid = spaceId != null ? spaceId : 0L;
+        log.info("[AI初审] 开始调用混元 pictureId={} spaceId={}", pictureId, sid);
         try {
             PictureModerationResult result = hunyuanManager.moderatePictureByUrl(imageUrl);
             if (result == null || result.getPass() == null) {
-                log.warn("图片 AI 审核无有效结果，保持待人工审核 pictureId={} spaceId={}", pictureId, sid);
+                log.warn("[AI初审] 无有效结果(接口失败/解析失败/返回空)，保持待人工审核 pictureId={} spaceId={}", pictureId, sid);
                 return;
             }
             String reason = StrUtil.blankToDefault(StrUtil.trim(result.getReason()), "未说明");
             Date now = new Date();
             if (Boolean.FALSE.equals(result.getPass())) {
+                log.info("[AI初审] 判定不通过，已写库拒绝 pictureId={} spaceId={} reason={}", pictureId, sid, reason);
                 pictureMapper.update(null, new LambdaUpdateWrapper<Picture>()
                         .eq(Picture::getId, pictureId)
                         .eq(Picture::getSpaceId, sid)
@@ -66,6 +69,7 @@ public class PictureAiModerationService {
                         .set(Picture::getReviewTime, now)
                         .set(Picture::getEditTime, now));
             } else {
+                log.info("[AI初审] 判定通过，待人工审核 pictureId={} spaceId={} reason={}", pictureId, sid, reason);
                 pictureMapper.update(null, new LambdaUpdateWrapper<Picture>()
                         .eq(Picture::getId, pictureId)
                         .eq(Picture::getSpaceId, sid)
@@ -74,7 +78,7 @@ public class PictureAiModerationService {
                         .set(Picture::getEditTime, now));
             }
         } catch (Exception e) {
-            log.error("图片 AI 审核异常 pictureId={} spaceId={}", pictureId, sid, e);
+            log.error("[AI初审] 异常 pictureId={} spaceId={}", pictureId, sid, e);
         }
     }
 }

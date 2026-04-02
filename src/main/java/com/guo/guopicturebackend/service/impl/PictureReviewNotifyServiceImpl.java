@@ -54,8 +54,14 @@ public class PictureReviewNotifyServiceImpl implements PictureReviewNotifyServic
 
         userMessageService.sendToUser(owner.getId(), title, body.toString(),
                 UserMessageBizType.PICTURE_REVIEW, picture.getId());
+        log.info("[审核通知] 站内信已写入 userId={} pictureId={} title={}", owner.getId(), picture.getId(), title);
 
-        if (javaMailSender == null || StrUtil.isBlank(owner.getUserEmail())) {
+        if (javaMailSender == null) {
+            log.debug("[审核通知] 未发邮件：未配置 spring.mail（无 JavaMailSender）");
+            return;
+        }
+        if (StrUtil.isBlank(owner.getUserEmail())) {
+            log.debug("[审核通知] 未发邮件：用户未绑定邮箱 userId={}", owner.getId());
             return;
         }
         try {
@@ -67,8 +73,9 @@ public class PictureReviewNotifyServiceImpl implements PictureReviewNotifyServic
             mail.setSubject("[图库] " + title);
             mail.setText(body.toString());
             javaMailSender.send(mail);
+            log.info("[审核通知] 邮件已发送 to={} pictureId={}", owner.getUserEmail(), picture.getId());
         } catch (Exception e) {
-            log.warn("审核结果邮件发送失败 userId={} email={}", owner.getId(), owner.getUserEmail(), e);
+            log.warn("[审核通知] 邮件发送失败 userId={} email={}", owner.getId(), owner.getUserEmail(), e);
         }
     }
 }
