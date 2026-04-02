@@ -16,6 +16,8 @@ import com.guo.guopicturebackend.constant.UserConstant;
 import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.exception.ThrowUtils;
+import com.guo.guopicturebackend.elasticsearch.PictureEsSearchService;
+import com.guo.guopicturebackend.elasticsearch.PictureEsSyncService;
 import com.guo.guopicturebackend.manager.cache.PictureMultiLevelCacheService;
 import com.guo.guopicturebackend.manager.auth.SpaceUserAuthManager;
 import com.guo.guopicturebackend.manager.auth.StpKit;
@@ -56,6 +58,12 @@ public class PictureController {
 
     @Resource
     private PictureMultiLevelCacheService pictureMultiLevelCacheService;
+
+    @Resource
+    private PictureEsSearchService pictureEsSearchService;
+
+    @Resource
+    private PictureEsSyncService pictureEsSyncService;
 
     @Resource
     private SpaceService spaceService;
@@ -164,7 +172,22 @@ public class PictureController {
         if (spaceId == 0L) {
             pictureMultiLevelCacheService.bumpPublicListCacheVersion();
         }
+        Picture updated = pictureService.getPictureByIdAndSpaceId(id, spaceId);
+        if (updated != null) {
+            pictureEsSyncService.saveOrUpdate(updated);
+        }
         return ResultUtils.success(true);
+    }
+
+
+    /**
+     * 管理员：全量重建 Elasticsearch 图片索引（启用 ES 后首次或修复数据用）
+     */
+    @PostMapping("/es/reindex")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Long> reindexPictureToEs() {
+        long n = pictureEsSyncService.reindexAll();
+        return ResultUtils.success(n);
     }
 
 
@@ -254,6 +277,14 @@ public class PictureController {
             List<String> permissionList = spaceUserAuthManager.getPermissionList(space, loginUser);
             if (!permissionList.contains(SpaceUserPermissionConstant.PICTURE_VIEW)) {
                 throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限查看该空间的图片");
+            }
+        }
+
+        if (pictureEsSearchService.supportsEsQuery(pictureQueryRequest)) {
+            try {
+                return ResultUtils.success(pictureEsSearchService.searchPictureVoPage(pictureQueryRequest, request));
+            } catch (Exception e) {
+                log.warn("Elasticsearch 搜索失败，回退数据库查询", e);
             }
         }
 

@@ -16,6 +16,7 @@ import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.exception.ThrowUtils;
 import com.guo.guopicturebackend.config.HunyuanProperties;
+import com.guo.guopicturebackend.elasticsearch.PictureEsSyncService;
 import com.guo.guopicturebackend.manager.cache.PictureMultiLevelCacheService;
 import com.guo.guopicturebackend.manager.CosManager;
 import com.guo.guopicturebackend.manager.FileManager;
@@ -111,6 +112,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     @Lazy
     @Resource
     private PictureMultiLevelCacheService pictureMultiLevelCacheService;
+
+    @Lazy
+    @Resource
+    private PictureEsSyncService pictureEsSyncService;
 
     @Override
     public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
@@ -245,6 +250,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         if (spaceIdForStorage == 0L) {
             pictureMultiLevelCacheService.bumpPublicListCacheVersion();
         }
+
+        pictureEsSyncService.saveOrUpdate(picture);
 
         return PictureVO.objToVo(picture);
     }
@@ -411,6 +418,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         pictureMultiLevelCacheService.invalidatePictureDetail(spaceId, id);
         pictureMultiLevelCacheService.bumpPublicListCacheVersion();
 
+        pictureEsSyncService.saveOrUpdate(this.getPictureByIdAndSpaceId(id, spaceId));
+
         String msg = pictureReviewRequest.getReviewMessage();
         if (StrUtil.isBlank(msg)) {
             msg = PictureReviewStatusEnum.PASS.equals(reviewStatusEnum)
@@ -560,6 +569,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         if (spaceIdForQuery == 0L) {
             pictureMultiLevelCacheService.bumpPublicListCacheVersion();
         }
+        pictureEsSyncService.deleteByPictureId(pictureId);
         // 异步清理文件
         this.clearPictureFile(oldPicture);
     }
@@ -600,6 +610,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         if (spaceId == 0L) {
             pictureMultiLevelCacheService.bumpPublicListCacheVersion();
         }
+        pictureEsSyncService.saveOrUpdate(this.getPictureByIdAndSpaceId(id, spaceId));
     }
 
 
@@ -699,6 +710,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
         for (Picture p : pictureList) {
             pictureMultiLevelCacheService.invalidatePictureDetail(spaceId, p.getId());
+            pictureEsSyncService.saveOrUpdate(p);
         }
     }
 

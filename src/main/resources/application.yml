@@ -66,6 +66,13 @@ picture:
 # cos.client.multipart-upload-threshold: 5242880
 # cos.client.minimum-upload-part-size: 1048576
 
+# Elasticsearch：默认关闭；开启后需本地或远程 ES 7.x，并执行一次管理员接口全量重建索引
+elasticsearch:
+  enabled: false
+  index-name: guo_picture
+  uris:
+    - http://127.0.0.1:9200
+
 tencent:
   hunyuan:
     enabled: false
