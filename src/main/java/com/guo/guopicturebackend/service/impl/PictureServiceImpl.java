@@ -16,6 +16,7 @@ import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.exception.ThrowUtils;
 import com.guo.guopicturebackend.config.HunyuanProperties;
+import com.guo.guopicturebackend.manager.cache.PictureMultiLevelCacheService;
 import com.guo.guopicturebackend.manager.CosManager;
 import com.guo.guopicturebackend.manager.FileManager;
 import com.guo.guopicturebackend.manager.upload.FilePictureUpload;
@@ -106,6 +107,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     @Resource
     private PictureReviewNotifyService pictureReviewNotifyService;
+
+    @Lazy
+    @Resource
+    private PictureMultiLevelCacheService pictureMultiLevelCacheService;
 
     @Override
     public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
@@ -232,6 +237,13 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
                 && hunyuanProperties.isEnabled()
                 && hunyuanProperties.isAiReviewEnabled()) {
             pictureAiModerationService.scheduleAfterUpload(picture.getId(), spaceIdForStorage, picture.getUrl());
+        }
+
+        if (pictureId != null) {
+            pictureMultiLevelCacheService.invalidatePictureDetail(spaceIdForStorage, picture.getId());
+        }
+        if (spaceIdForStorage == 0L) {
+            pictureMultiLevelCacheService.bumpPublicListCacheVersion();
         }
 
         return PictureVO.objToVo(picture);
@@ -396,6 +408,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         boolean result = this.update(updatePicture, updateWrapper);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
 
+        pictureMultiLevelCacheService.invalidatePictureDetail(spaceId, id);
+        pictureMultiLevelCacheService.bumpPublicListCacheVersion();
+
         String msg = pictureReviewRequest.getReviewMessage();
         if (StrUtil.isBlank(msg)) {
             msg = PictureReviewStatusEnum.PASS.equals(reviewStatusEnum)
@@ -541,6 +556,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             }
             return true;
         });
+        pictureMultiLevelCacheService.invalidatePictureDetail(spaceIdForQuery, pictureId);
+        if (spaceIdForQuery == 0L) {
+            pictureMultiLevelCacheService.bumpPublicListCacheVersion();
+        }
         // 异步清理文件
         this.clearPictureFile(oldPicture);
     }
@@ -577,6 +596,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         pictureMetaStatService.applyPictureMetadataDelta(
                 oldPicture.getCategory(), oldPicture.getTags(),
                 picture.getCategory(), picture.getTags());
+        pictureMultiLevelCacheService.invalidatePictureDetail(spaceId, id);
+        if (spaceId == 0L) {
+            pictureMultiLevelCacheService.bumpPublicListCacheVersion();
+        }
     }
 
 
@@ -673,6 +696,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         for (PictureMetaDelta d : deltas) {
             pictureMetaStatService.applyPictureMetadataDelta(d.oldCategory, d.oldTagsJson, d.newCategory, d.newTagsJson);
+        }
+        for (Picture p : pictureList) {
+            pictureMultiLevelCacheService.invalidatePictureDetail(spaceId, p.getId());
         }
     }
 

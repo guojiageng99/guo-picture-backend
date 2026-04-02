@@ -53,6 +53,14 @@ knife4j:
           - com.guo.guopicturebackend.controller
 
 # 腾讯混元（密钥见 application-local.yml；此处为默认占位）
+# 公共列表 / 详情多级缓存、热点本地缓存（可选覆盖默认值）
+picture:
+  cache:
+    list-redis-ttl-base-seconds: 300
+    list-redis-ttl-jitter-seconds: 300
+    hot-access-threshold: 40
+    hot-window-seconds: 120
+
 tencent:
   hunyuan:
     enabled: false
