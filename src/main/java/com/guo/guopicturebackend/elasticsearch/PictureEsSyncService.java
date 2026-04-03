@@ -87,6 +87,7 @@ public class PictureEsSyncService {
     private PictureEsDocument toDocument(Picture p) {
         long sid = p.getSpaceId() == null ? 0L : p.getSpaceId();
         String cat = StrUtil.blankToDefault(p.getCategory(), "");
+        long ct = p.getCreateTime() == null ? 0L : p.getCreateTime().getTime();
         return PictureEsDocument.builder()
                 .id(String.valueOf(p.getId()))
                 .spaceId(sid)
@@ -94,6 +95,7 @@ public class PictureEsSyncService {
                 .introduction(StrUtil.nullToEmpty(p.getIntroduction()))
                 .reviewStatus(p.getReviewStatus())
                 .category(cat)
+                .createTimeMillis(ct)
                 .build();
     }
 }

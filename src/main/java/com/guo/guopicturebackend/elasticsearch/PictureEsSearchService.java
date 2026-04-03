@@ -12,6 +12,8 @@ import com.guo.guopicturebackend.service.PictureService;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.MultiMatchQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.sort.SortBuilders;
+import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -56,7 +58,7 @@ public class PictureEsSearchService {
         if (!isActive() || StrUtil.isBlank(q.getSearchText())) {
             return false;
         }
-        if (StrUtil.isNotEmpty(q.getSortField())) {
+        if (!isEsCompatibleSortField(q.getSortField())) {
             return false;
         }
         if (ObjUtil.isNotEmpty(q.getId())) {
@@ -96,6 +98,13 @@ public class PictureEsSearchService {
         return true;
     }
 
+    /**
+     * 列表默认按 createTime 排序；仅该字段与 ES 文档中的 createTimeMillis 对齐，其它排序仍走 MySQL。
+     */
+    private static boolean isEsCompatibleSortField(String sortField) {
+        return StrUtil.isBlank(sortField) || "createTime".equals(sortField);
+    }
+
     public Page<PictureVO> searchPictureVoPage(PictureQueryRequest q, HttpServletRequest request) {
         String text = q.getSearchText().trim();
         long current = q.getCurrent();
@@ -118,9 +127,13 @@ public class PictureEsSearchService {
             bool.filter(QueryBuilders.termQuery("category", q.getCategory().trim()));
         }
 
+        SortOrder timeOrder = "ascend".equalsIgnoreCase(StrUtil.nullToEmpty(q.getSortOrder()))
+                ? SortOrder.ASC
+                : SortOrder.DESC;
         NativeSearchQuery searchQuery = new NativeSearchQueryBuilder()
                 .withQuery(bool)
                 .withPageable(PageRequest.of((int) Math.max(0, current - 1), (int) size))
+                .withSort(SortBuilders.fieldSort("createTimeMillis").order(timeOrder))
                 .build();
 
         SearchHits<PictureEsDocument> hits = elasticsearchOperations.search(searchQuery, PictureEsDocument.class);

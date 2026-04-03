@@ -282,10 +282,15 @@ public class PictureController {
 
         if (pictureEsSearchService.supportsEsQuery(pictureQueryRequest)) {
             try {
+                log.info("图片列表【Elasticsearch】searchText={} spaceId={}",
+                        pictureQueryRequest.getSearchText(), pictureQueryRequest.getSpaceId());
                 return ResultUtils.success(pictureEsSearchService.searchPictureVoPage(pictureQueryRequest, request));
             } catch (Exception e) {
                 log.warn("Elasticsearch 搜索失败，回退数据库查询", e);
             }
+        } else if (StrUtil.isNotBlank(pictureQueryRequest.getSearchText())) {
+            log.info("图片列表【MySQL/缓存】searchText={}（含 tags/排序等条件时不走 ES）spaceId={}",
+                    pictureQueryRequest.getSearchText(), pictureQueryRequest.getSpaceId());
         }
 
         if (pictureQueryRequest.getSpaceId() == null) {

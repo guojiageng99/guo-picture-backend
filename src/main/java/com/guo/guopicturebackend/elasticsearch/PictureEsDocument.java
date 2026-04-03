@@ -36,4 +36,8 @@ public class PictureEsDocument {
 
     @Field(type = FieldType.Keyword)
     private String category;
+
+    /** 与列表 ORDER BY createTime 对齐，用于 ES 排序 */
+    @Field(type = FieldType.Long)
+    private Long createTimeMillis;
 }
