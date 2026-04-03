@@ -82,5 +82,14 @@ public interface UserService extends IService<User> {
      */
     boolean isAdmin(User user);
 
+    /**
+     * 预扣扩图额度，成功返回 true
+     */
+    boolean tryDeductOutpaintQuota(Long userId, int cost);
+
+    /**
+     * 退回扩图额度（幂等由调用方结合任务 quotaRefunded 保证）
+     */
+    void refundOutpaintQuota(Long userId, int cost);
 
 }

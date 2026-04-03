@@ -9,9 +9,6 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.guo.guopicturebackend.api.aliyun.AliYunAiApi;
-import com.guo.guopicturebackend.api.aliyun.model.CreateOutPaintingTaskRequest;
-import com.guo.guopicturebackend.api.aliyun.model.CreateOutPaintingTaskResponse;
 import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.exception.ThrowUtils;
@@ -88,9 +85,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     @Resource
     private TransactionTemplate transactionTemplate;
-
-    @Resource
-    private AliYunAiApi aliYunAiApi;
 
     @Resource
     private PictureMetaStatService pictureMetaStatService;
@@ -751,38 +745,16 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     }
 
     @Override
-    public CreateOutPaintingTaskResponse createPictureOutPaintingTask(
-            CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, User loginUser) {
-        // 获取图片信息，分表时必须带 spaceId 条件
-        Long pictureId = createPictureOutPaintingTaskRequest.getPictureId();
-        Long spaceId = createPictureOutPaintingTaskRequest.getSpaceId() != null
-                ? createPictureOutPaintingTaskRequest.getSpaceId() : 0L;
-        Picture picture = Optional.ofNullable(this.getPictureByIdAndSpaceId(pictureId, spaceId))
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ERROR));
-        // 权限校验
-//        checkPictureAuth(loginUser, picture);
-        // 构造请求参数
-        CreateOutPaintingTaskRequest taskRequest = new CreateOutPaintingTaskRequest();
-        CreateOutPaintingTaskRequest.Input input = new CreateOutPaintingTaskRequest.Input();
-        input.setImageUrl(picture.getUrl());
-        taskRequest.setInput(input);
-        BeanUtil.copyProperties(createPictureOutPaintingTaskRequest, taskRequest);
-        // 创建任务
-        return aliYunAiApi.createOutPaintingTask(taskRequest);
-    }
-
-    @Override
     public void checkPictureAuth(User loginUser, Picture picture) {
         Long spaceId = picture.getSpaceId();
         Long loginUserId = loginUser.getId();
-        if (spaceId == null) {
-            // 公共图库，仅本人或管理员可操作
+        // 分表约定：spaceId 为 null 或 0 表示公共图库
+        if (spaceId == null || spaceId == 0L) {
             if (!picture.getUserId().equals(loginUserId) && !userService.isAdmin(loginUser)) {
                 throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
             }
         } else {
-            // 私有空间，仅空间管理员可操作
-            if (!picture.getUserId().equals(loginUserId)) {
+            if (!picture.getUserId().equals(loginUserId) && !userService.isAdmin(loginUser)) {
                 throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
             }
         }

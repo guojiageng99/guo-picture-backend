@@ -161,14 +161,12 @@ public class SpaceUserAuthManager {
         }
         // 如果没有 spaceUserId，尝试通过 spaceId 或 pictureId 获取 Space 对象并处理
         Long spaceId = authContext.getSpaceId();
-        if (spaceId == null) {
-            // 如果没有 spaceId，通过 pictureId 获取 Picture 对象和 Space 对象
+        // 请求里 spaceId 为 null 或 0 均视为公共图库上下文，需结合 pictureId 解析
+        if (spaceId == null || spaceId == 0L) {
             Long pictureId = authContext.getPictureId();
-            // 图片 id 也没有，则默认通过权限校验
             if (pictureId == null) {
                 return ADMIN_PERMISSIONS;
             }
-            // 分表时必须带 spaceId 条件，优先使用请求中的 spaceId
             Long spaceIdFromRequest = authContext.getSpaceId();
             Long spaceIdForQuery = spaceIdFromRequest != null ? spaceIdFromRequest : 0L;
             Picture picture = pictureService.getPictureByIdAndSpaceId(pictureId, spaceIdForQuery);
@@ -176,12 +174,11 @@ public class SpaceUserAuthManager {
                 throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "未找到图片信息");
             }
             spaceId = picture.getSpaceId();
-            // 公共图库，仅本人或管理员可操作
-            if (spaceId == null) {
+            // 公共图库：spaceId 为 null 或 0
+            if (spaceId == null || spaceId == 0L) {
                 if (picture.getUserId().equals(userId) || userService.isAdmin(loginUser)) {
                     return ADMIN_PERMISSIONS;
                 } else {
-                    // 不是自己的图片，仅可查看
                     return Collections.singletonList(SpaceUserPermissionConstant.PICTURE_VIEW);
                 }
             }

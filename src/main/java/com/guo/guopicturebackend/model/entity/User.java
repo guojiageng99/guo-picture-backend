@@ -80,6 +80,11 @@ public class User implements Serializable {
     @TableLogic
     private Integer isDelete;
 
+    /**
+     * AI 扩图剩余次数（预扣制）
+     */
+    private Integer outpaintQuota;
+
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
 

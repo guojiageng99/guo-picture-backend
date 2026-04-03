@@ -11,6 +11,7 @@ import com.guo.guopicturebackend.api.aliyun.model.CreateOutPaintingTaskResponse;
 import com.guo.guopicturebackend.api.aliyun.model.GetOutPaintingTaskResponse;
 import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
+import com.guo.guopicturebackend.outpainting.OutPaintingDashScopeErrorMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -55,7 +56,8 @@ public class AliYunAiApi {
             if (StrUtil.isNotBlank(errorCode)) {
                 String errorMessage = response.getMessage();
                 log.error("AI 扩图失败，errorCode:{}, errorMessage:{}", errorCode, errorMessage);
-                throw new BusinessException(ErrorCode.OPERATION_ERROR, "AI 扩图接口响应异常");
+                String userMsg = OutPaintingDashScopeErrorMapper.toUserMessage(errorCode, errorMessage);
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, userMsg);
             }
             return response;
         }

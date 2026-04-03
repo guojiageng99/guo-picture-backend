@@ -73,6 +73,17 @@ elasticsearch:
   uris:
     - http://127.0.0.1:9200
 
+# AI 扩图：额度、限流、超时对账、RabbitMQ（mq-enabled=true 时需可连 RabbitMQ）
+outpainting:
+  mq-enabled: true
+  rate-limit-per-minute: 3
+  local-timeout-minutes: 10
+  reconcile-max-attempts: 6
+  quota-standard-cost: 1
+  quota-hd-cost: 2
+  new-user-quota: 10
+  scheduler-delay-ms: 60000
+
 tencent:
   hunyuan:
     enabled: false

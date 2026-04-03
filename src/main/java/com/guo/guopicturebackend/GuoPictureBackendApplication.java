@@ -11,13 +11,17 @@ import org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestCli
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+import com.guo.guopicturebackend.config.OutpaintingProperties;
 
 @SpringBootApplication(exclude = {
         ElasticsearchRestClientAutoConfiguration.class,
         ElasticsearchDataAutoConfiguration.class
 })
-@EnableConfigurationProperties({HunyuanProperties.class, PictureCacheProperties.class, ElasticsearchProperties.class})
+@EnableConfigurationProperties({HunyuanProperties.class, PictureCacheProperties.class, ElasticsearchProperties.class, OutpaintingProperties.class})
 @EnableAsync
+@EnableScheduling
 @MapperScan("com.guo.guopicturebackend.mapper")
 @EnableAspectJAutoProxy(exposeProxy = true)
 public class GuoPictureBackendApplication {

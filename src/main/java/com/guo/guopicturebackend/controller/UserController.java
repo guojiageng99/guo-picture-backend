@@ -59,6 +59,17 @@ public class UserController {
         return ResultUtils.success(userService.getLoginUserVO(loginUser));
     }
 
+    /**
+     * 当前用户 AI 扩图剩余次数
+     */
+    @GetMapping("/outpaint/quota")
+    public BaseResponse<Integer> getOutpaintQuota(HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        User fresh = userService.getById(loginUser.getId());
+        int q = fresh != null && fresh.getOutpaintQuota() != null ? fresh.getOutpaintQuota() : 0;
+        return ResultUtils.success(q);
+    }
+
 
     @PostMapping("/logout")
     public BaseResponse<Boolean> userLogout(HttpServletRequest request) {

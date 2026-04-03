@@ -4,9 +4,6 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.guo.guopicturebackend.annotation.AuthCheck;
-import com.guo.guopicturebackend.api.aliyun.AliYunAiApi;
-import com.guo.guopicturebackend.api.aliyun.model.CreateOutPaintingTaskResponse;
-import com.guo.guopicturebackend.api.aliyun.model.GetOutPaintingTaskResponse;
 import com.guo.guopicturebackend.api.imagesearch.my.ImageSearchApiFacade;
 import com.guo.guopicturebackend.api.imagesearch.my.model.ImageSearchResult;
 import com.guo.guopicturebackend.common.BaseResponse;
@@ -28,8 +25,12 @@ import com.guo.guopicturebackend.model.entity.Picture;
 import com.guo.guopicturebackend.model.entity.Space;
 import com.guo.guopicturebackend.model.entity.User;
 import com.guo.guopicturebackend.model.enums.PictureReviewStatusEnum;
+import com.guo.guopicturebackend.model.vo.PictureOutpaintSubmitVO;
+import com.guo.guopicturebackend.model.vo.PictureOutpaintTaskVO;
 import com.guo.guopicturebackend.model.vo.PictureTagCategory;
 import com.guo.guopicturebackend.model.vo.PictureVO;
+import com.guo.guopicturebackend.outpainting.OutPaintingSubmitService;
+import com.guo.guopicturebackend.outpainting.OutPaintingTaskQueryService;
 import com.guo.guopicturebackend.service.PictureCategoryService;
 import com.guo.guopicturebackend.service.PictureMetaStatService;
 import com.guo.guopicturebackend.service.PictureService;
@@ -69,7 +70,10 @@ public class PictureController {
     private SpaceService spaceService;
 
     @Resource
-    private AliYunAiApi aliYunAiApi;
+    private OutPaintingSubmitService outPaintingSubmitService;
+
+    @Resource
+    private OutPaintingTaskQueryService outPaintingTaskQueryService;
 
     @Autowired
     private StpKit stpKit;
@@ -469,29 +473,45 @@ public class PictureController {
 
 
     /**
-     * 创建 AI 扩图任务
+     * 创建 AI 扩图任务（预扣额度，事务提交后 MQ 或异步线程提交阿里云）
      */
     @PostMapping("/out_painting/create_task")
     @SaSpaceCheckPermission(value = SpaceUserPermissionConstant.PICTURE_EDIT)
-    public BaseResponse<CreateOutPaintingTaskResponse> createPictureOutPaintingTask(
+    public BaseResponse<PictureOutpaintSubmitVO> createPictureOutPaintingTask(
             @RequestBody CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest,
             HttpServletRequest request) {
         if (createPictureOutPaintingTaskRequest == null || createPictureOutPaintingTaskRequest.getPictureId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        CreateOutPaintingTaskResponse response = pictureService.createPictureOutPaintingTask(createPictureOutPaintingTaskRequest, loginUser);
-        return ResultUtils.success(response);
+        PictureOutpaintSubmitVO vo = outPaintingSubmitService.submit(createPictureOutPaintingTaskRequest, loginUser);
+        return ResultUtils.success(vo);
     }
 
     /**
-     * 查询 AI 扩图任务
+     * 查询 AI 扩图任务（业务 id，非阿里云 taskId）
      */
-    @GetMapping("/out_painting/get_task")
-    public BaseResponse<GetOutPaintingTaskResponse> getPictureOutPaintingTask(String taskId) {
-        ThrowUtils.throwIf(StrUtil.isBlank(taskId), ErrorCode.PARAMS_ERROR);
-        GetOutPaintingTaskResponse task = aliYunAiApi.getOutPaintingTask(taskId);
-        return ResultUtils.success(task);
+    @GetMapping("/out_painting/task/{id}")
+    public BaseResponse<PictureOutpaintTaskVO> getPictureOutPaintingTaskById(
+            @PathVariable("id") long id,
+            HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(outPaintingTaskQueryService.getTaskVo(id, loginUser));
+    }
+
+    /**
+     * 扩图任务历史分页（本人；管理员可传 userId 查他人）
+     */
+    @PostMapping("/out_painting/task/list/page")
+    public BaseResponse<Page<PictureOutpaintTaskVO>> listPictureOutPaintingTaskPage(
+            @RequestBody PictureOutpaintTaskQueryRequest queryRequest,
+            HttpServletRequest request) {
+        ThrowUtils.throwIf(queryRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        if (!userService.isAdmin(loginUser) && queryRequest.getUserId() != null) {
+            queryRequest.setUserId(null);
+        }
+        return ResultUtils.success(outPaintingTaskQueryService.pageTasks(queryRequest, loginUser));
     }
 
 

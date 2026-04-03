@@ -5,7 +5,9 @@ import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.guo.guopicturebackend.config.OutpaintingProperties;
 import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.manager.auth.StpKit;
@@ -21,8 +23,10 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 
+import java.util.Date;
 import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,6 +43,9 @@ import static com.guo.guopicturebackend.constant.UserConstant.USER_LOGIN_STATE;
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         implements UserService {
+
+    @Resource
+    private OutpaintingProperties outpaintingProperties;
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword,
@@ -91,6 +98,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         user.setUserEmail(email);
         user.setUserName("无名");
         user.setUserRole(UserRoleEnum.USER.getValue());
+        int defQ = outpaintingProperties != null ? outpaintingProperties.getNewUserQuota() : 10;
+        user.setOutpaintQuota(defQ);
         boolean saveResult = this.save(user);
         if (!saveResult) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
@@ -145,6 +154,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
         LoginUserVO loginUserVO = new LoginUserVO();
         BeanUtils.copyProperties(user, loginUserVO);
+        if (loginUserVO.getOutpaintQuota() == null) {
+            loginUserVO.setOutpaintQuota(0);
+        }
         return loginUserVO;
     }
 
@@ -231,7 +243,30 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return user != null && UserRoleEnum.ADMIN.getValue().equals(user.getUserRole());
     }
 
+    @Override
+    public boolean tryDeductOutpaintQuota(Long userId, int cost) {
+        if (userId == null || cost <= 0) {
+            return false;
+        }
+        return this.baseMapper.update(null,
+                new LambdaUpdateWrapper<User>()
+                        .setSql("outpaintQuota = outpaintQuota - " + cost)
+                        .set(User::getUpdateTime, new Date())
+                        .eq(User::getId, userId)
+                        .ge(User::getOutpaintQuota, cost)) > 0;
+    }
 
+    @Override
+    public void refundOutpaintQuota(Long userId, int cost) {
+        if (userId == null || cost <= 0) {
+            return;
+        }
+        this.baseMapper.update(null,
+                new LambdaUpdateWrapper<User>()
+                        .setSql("outpaintQuota = outpaintQuota + " + cost)
+                        .set(User::getUpdateTime, new Date())
+                        .eq(User::getId, userId));
+    }
 
 }
 

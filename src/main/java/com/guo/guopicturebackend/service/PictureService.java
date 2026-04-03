@@ -2,7 +2,6 @@ package com.guo.guopicturebackend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.guo.guopicturebackend.api.aliyun.model.CreateOutPaintingTaskResponse;
 import com.guo.guopicturebackend.model.dto.picture.*;
 import com.guo.guopicturebackend.model.entity.Picture;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -87,9 +86,5 @@ public interface PictureService extends IService<Picture> {
     public void editPicture(PictureEditRequest pictureEditRequest, User loginUser);
 
     public void editPictureByBatch(PictureEditByBatchRequest pictureEditByBatchRequest, User loginUser);
-
-    public CreateOutPaintingTaskResponse createPictureOutPaintingTask(
-            CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, User loginUser);
-
 
 }

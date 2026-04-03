@@ -66,5 +66,10 @@ public class LoginUserVO implements Serializable {
      */
     private Date updateTime;
 
+    /**
+     * AI 扩图剩余次数
+     */
+    private Integer outpaintQuota;
+
     private static final long serialVersionUID = -3711345618461709848L;
 }
