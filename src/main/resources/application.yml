@@ -56,6 +56,8 @@ knife4j:
 # 腾讯混元（密钥见 application-local.yml；此处为默认占位）
 # 公共列表 / 详情多级缓存、热点本地缓存（可选覆盖默认值）
 picture:
+  # 通过 URL 下载图片（如扩图结果落库）时 Hutool HTTP 连接+读取超时，毫秒
+  url-download-timeout-ms: 60000
   cache:
     list-redis-ttl-base-seconds: 300
     list-redis-ttl-jitter-seconds: 300

@@ -9,6 +9,7 @@ import cn.hutool.http.Method;
 import com.guo.guopicturebackend.exception.BusinessException;
 import com.guo.guopicturebackend.exception.ErrorCode;
 import com.guo.guopicturebackend.exception.ThrowUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -18,7 +19,11 @@ import java.util.Arrays;
 import java.util.List;
 
 @Service
-public class UrlPictureUpload extends PictureUploadTemplate {  
+public class UrlPictureUpload extends PictureUploadTemplate {
+
+    @Value("${picture.url-download-timeout-ms:60000}")
+    private int urlDownloadTimeoutMs;
+
     @Override  
     protected void validPicture(Object inputSource) {  
         String fileUrl = (String) inputSource;  
@@ -38,7 +43,7 @@ public class UrlPictureUpload extends PictureUploadTemplate {
         // 3. 发送 HEAD 请求以验证文件是否存在
         HttpResponse response = null;
         try {
-            response = HttpUtil.createRequest(Method.HEAD, fileUrl).execute();
+            response = HttpUtil.createRequest(Method.HEAD, fileUrl).timeout(urlDownloadTimeoutMs).execute();
             // 未正常返回，无需执行其他判断
             if (response.getStatus() != HttpStatus.HTTP_OK) {
                 return;
@@ -78,8 +83,12 @@ public class UrlPictureUpload extends PictureUploadTemplate {
   
     @Override  
     protected void processFile(Object inputSource, File file) throws Exception {
-        String fileUrl = (String) inputSource;  
-        // 下载文件到临时目录  
-        HttpUtil.downloadFile(fileUrl, file);
-    }  
+        String fileUrl = (String) inputSource;
+        try (HttpResponse response = HttpUtil.createGet(fileUrl).timeout(urlDownloadTimeoutMs).execute()) {
+            if (response.getStatus() != HttpStatus.HTTP_OK) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "文件下载失败");
+            }
+            response.writeBody(file);
+        }
+    }
 }

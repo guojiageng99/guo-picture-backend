@@ -120,14 +120,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         // 校验空间是否存在
         // 空间权限校验
         Long spaceId = pictureUploadRequest.getSpaceId();
-        if (spaceId != null) {
+        // 0 与 null 均表示公共图库，无 space 表记录，不可 getById(0)
+        if (spaceId != null && spaceId > 0L) {
             Space space = spaceService.getById(spaceId);
             ThrowUtils.throwIf(space == null, ErrorCode.NOT_FOUND_ERROR, "空间不存在");
-//            // 必须空间创建人（管理员）才能上传
-//            if (!loginUser.getId().equals(space.getUserId())) {
-//                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有空间权限");
-//            }
-            // 校验额度
             if (space.getTotalCount() >= space.getMaxCount()) {
                 throw new BusinessException(ErrorCode.OPERATION_ERROR, "空间条数不足");
             }
@@ -144,22 +140,24 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
         // 如果是更新图片，需要校验图片是否存在，分表时必须带 spaceId 条件
         if (pictureId != null) {
-            Picture oldPicture = spaceId != null
-                    ? this.getPictureByIdAndSpaceId(pictureId, spaceId)
-                    : this.getPictureByIdAndSpaceId(pictureId, 0L);
+            long sidForQuery = spaceId != null && spaceId > 0L ? spaceId : 0L;
+            Picture oldPicture = this.getPictureByIdAndSpaceId(pictureId, sidForQuery);
             ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR, "图片不存在");
 //            // 仅本人或管理员可编辑
 //            if (!oldPicture.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
 //                throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
 //            }
             // 校验空间是否一致
-            // 没传 spaceId，则复用原有图片的 spaceId
             if (spaceId == null) {
                 if (oldPicture.getSpaceId() != null) {
                     spaceId = oldPicture.getSpaceId();
                 }
+            } else if (spaceId == 0L) {
+                // 显式公共图库：旧图须为公共（null 或 0），不可把 0 当成「沿用私有空间」
+                Long oldSid = oldPicture.getSpaceId();
+                boolean oldPublic = oldSid == null || oldSid == 0L;
+                ThrowUtils.throwIf(!oldPublic, ErrorCode.PARAMS_ERROR, "空间 id 不一致");
             } else {
-                // 传了 spaceId，必须和原有图片一致
                 if (ObjUtil.notEqual(spaceId, oldPicture.getSpaceId())) {
                     throw new BusinessException(ErrorCode.PARAMS_ERROR, "空间 id 不一致");
                 }
@@ -169,7 +167,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         // 上传图片，得到信息
         // 按照用户 id 划分目录 => 按照空间划分目录
         String uploadPathPrefix;
-        if (spaceId == null) {
+        if (spaceId == null || spaceId == 0L) {
             uploadPathPrefix = String.format("public/%s", loginUser.getId());
         } else {
             uploadPathPrefix = String.format("space/%s", spaceId);
@@ -182,9 +180,11 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         UploadPictureResult uploadPictureResult = pictureUploadTemplate.uploadPicture(inputSource, uploadPathPrefix);
         // 构造要入库的图片信息
         Picture picture = new Picture();
-        // 补充设置 spaceId，分表时 spaceId 不能为 null，默认为 0 表示公共图库
-        Long spaceIdForStorage = spaceId != null ? spaceId : 0L;
-        picture.setSpaceId(spaceIdForStorage);
+        // 分片键 spaceId：新增必须写入；更新时不可出现在 UPDATE SET 中，否则 ShardingSphere 抛 UnsupportedUpdatingShardingValueException
+        Long spaceIdForStorage = spaceId != null && spaceId > 0L ? spaceId : 0L;
+        if (pictureId == null) {
+            picture.setSpaceId(spaceIdForStorage);
+        }
         picture.setUrl(uploadPictureResult.getUrl());
         picture.setThumbnailUrl(uploadPictureResult.getThumbnailUrl());
         String picName = uploadPictureResult.getPicName();
@@ -209,10 +209,20 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             picture.setId(pictureId);
             picture.setEditTime(new Date());
         }
-        // 开启事务
+        // 开启事务（lambda 内须用 final 引用：pictureId 曾二次赋值，非 effectively final）
+        final Long finalPictureId = pictureId;
+        final Long finalSpaceIdForSharding = spaceIdForStorage;
         Long finalSpaceId = spaceId;
         transactionTemplate.execute(status -> {
-            boolean result = this.saveOrUpdate(picture);
+            boolean result;
+            if (finalPictureId != null) {
+                // WHERE 必须带分片键 spaceId，否则 ShardingSphere 会广播到所有 picture_* 表，极慢且易触发前端超时
+                UpdateWrapper<Picture> uw = new UpdateWrapper<>();
+                uw.eq("id", finalPictureId).eq("spaceId", finalSpaceIdForSharding);
+                result = this.update(picture, uw);
+            } else {
+                result = this.save(picture);
+            }
             ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "图片上传失败");
             // spaceId 为 0 表示公共图库，不更新空间额度
             if (finalSpaceId != null && finalSpaceId > 0) {
@@ -225,6 +235,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             }
             return picture;
         });
+
+        if (pictureId != null) {
+            picture.setSpaceId(spaceIdForStorage);
+        }
 
         if (pictureId == null
                 && hunyuanProperties.isEnabled()
